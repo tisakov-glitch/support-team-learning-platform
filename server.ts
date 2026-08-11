@@ -2411,7 +2411,7 @@ ${JSON.stringify(validKinds, null, 2)}
   // --- Vite dev server middleware integration & static build routing ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
