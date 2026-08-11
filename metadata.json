@@ -1,0 +1,6 @@
+{
+  "name": "Support Team Learning Platform",
+  "description": "A comprehensive platform for training technical support staff, starting with onboarding, user roles, and account management.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

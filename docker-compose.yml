@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: support_platform_db
+    restart: always
+    environment:
+      POSTGRES_USER: talgat
+      POSTGRES_PASSWORD: talgat
+      POSTGRES_DB: onb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  app:
+    build: .
+    container_name: support_platform_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=onb
+      - POSTGRES_USER=talgat
+      - POSTGRES_PASSWORD=talgat
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
