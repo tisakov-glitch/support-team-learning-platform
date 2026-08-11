@@ -31,8 +31,8 @@ echo "🐘 Setting up PostgreSQL..."
 sudo systemctl enable postgresql
 sudo systemctl start postgresql
 
-sudo -u postgres psql -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DB_USER}') THEN CREATE ROLE ${DB_USER} WITH LOGIN SUPERUSER PASSWORD '${DB_PASS}'; ELSE ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}'; END IF; END \$\$;"
-sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" || echo "Database ${DB_NAME} already exists."
+sudo -u postgres psql -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';"
+sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME};" || echo "Database ${DB_NAME} already exists."
 
 # 4. Create .env file if missing
 if [ ! -f .env ]; then

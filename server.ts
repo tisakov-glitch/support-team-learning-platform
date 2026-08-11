@@ -20,7 +20,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const DB_FILE = path.join(process.cwd(), 'database.json');
 
 // Interface for DB structure
@@ -590,12 +590,12 @@ if (process.env.POSTGRES_HOST || process.env.DATABASE_URL) {
   const poolConfig = process.env.DATABASE_URL
     ? { connectionString: process.env.DATABASE_URL }
     : {
-        host: process.env.POSTGRES_HOST || 'localhost',
-        port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-        user: process.env.POSTGRES_USER || 'talgat',
-        password: process.env.POSTGRES_PASSWORD || 'talgat',
-        database: process.env.POSTGRES_DB || 'onb'
-      };
+      host: process.env.POSTGRES_HOST || 'localhost',
+      port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+      user: process.env.POSTGRES_USER || 'talgat',
+      password: process.env.POSTGRES_PASSWORD || 'talgat',
+      database: process.env.POSTGRES_DB || 'onb'
+    };
   pgPool = new pg.Pool(poolConfig);
   pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
 }
@@ -1096,7 +1096,7 @@ async function startServer() {
         const pos = db.positions.find(p => p.code === emp.profile.positionCode);
         if (pos) {
           emp.profile.positionName = pos.name;
-          
+
           const dept = db.departments.find(d => d.id === pos.departmentId);
           if (dept) {
             emp.profile.department = dept.name;
@@ -1401,14 +1401,14 @@ async function startServer() {
         if (diffCount === 1) {
           const oldRankName = oldRanks[diffIndex];
           const newRankName = newRanks[diffIndex];
-          
+
           // Cascade rename to employees
           for (const emp of Object.values(db.employees)) {
             if (emp.profile && emp.profile.positionCode === code && emp.profile.rank === oldRankName) {
               emp.profile.rank = newRankName;
             }
           }
-          
+
           // Cascade rename to courses
           for (const course of db.courses) {
             if (course.positionCode === code && course.rank === oldRankName) {
@@ -1500,7 +1500,7 @@ async function startServer() {
             return true;
           });
         }
-        
+
         // Fallback to legacy single positionCode / rank
         if (course.positionCode !== posCode) return false;
         if (course.rank && course.rank !== rank) return false;
@@ -2073,7 +2073,7 @@ ${JSON.stringify(validKinds, null, 2)}
         ticket.closedAt = closedAt || new Date().toISOString();
         ticket.closedById = currentUser.id;
         ticket.closedByName = currentUser.name;
-        
+
         if (!ticket.resolvedAt) {
           ticket.resolvedAt = new Date().toISOString();
         }
