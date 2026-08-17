@@ -1804,7 +1804,13 @@ async function startServer() {
     res.status(201).json(newTicket);
   });
 
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash"
+];
 
 function formatGeminiError(err: any): string {
   let rawMsg = err?.message || String(err);
@@ -1812,11 +1818,15 @@ function formatGeminiError(err: any): string {
     if (typeof rawMsg === 'string' && rawMsg.trim().startsWith('{')) {
       const parsed = JSON.parse(rawMsg.trim());
       if (parsed?.error?.message) {
-        return parsed.error.message;
+        rawMsg = parsed.error.message;
       }
     }
   } catch (e) {
     // Ignore JSON parse error
+  }
+  
+  if (rawMsg.includes('RESOURCE_EXHAUSTED') || rawMsg.includes('prepayment credits') || rawMsg.includes('Quota exceeded')) {
+    return 'Закончились бесплатные лимиты / баланс ключа Gemini API. Пополните баланс или обновите GEMINI_API_KEY в .env.';
   }
   return rawMsg;
 }
@@ -1830,7 +1840,11 @@ async function generateGeminiContent(ai: any, params: any) {
         model,
       });
     } catch (err: any) {
-      console.warn(`[Gemini] Модель ${model} вернула ошибку:`, err?.message || err);
+      const msg = err?.message || String(err);
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('API_KEY_INVALID') || msg.includes('401') || msg.includes('403')) {
+        throw err;
+      }
+      console.warn(`[Gemini] Модель ${model} вернула ошибку:`, msg);
       lastError = err;
     }
   }
