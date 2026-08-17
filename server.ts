@@ -782,6 +782,52 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
         // ignore if table not created yet
       }
     }
+
+    for (const ch of data.supportChannels || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO support_channels (id, code, name)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name`,
+          [ch.id, ch.code, ch.name]
+        );
+      } catch (err) {}
+    }
+
+    for (const cl of data.supportClients || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO support_clients (id, name, countries)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, countries = EXCLUDED.countries`,
+          [cl.id, cl.name, JSON.stringify(cl.countries || [])]
+        );
+      } catch (err) {}
+    }
+
+    for (const st of data.supportStores || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO support_stores (id, name, client_id, country, code, status)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO UPDATE SET
+             name = EXCLUDED.name, client_id = EXCLUDED.client_id, country = EXCLUDED.country,
+             code = EXCLUDED.code, status = EXCLUDED.status`,
+          [st.id, st.name, st.clientId, st.country, st.code || null, st.status || 'active']
+        );
+      } catch (err) {}
+    }
+
+    for (const k of data.supportKinds || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO support_kinds (id, name)
+           VALUES ($1, $2)
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
+          [k.id, k.name]
+        );
+      } catch (err) {}
+    }
     for (const pos of data.positions || []) {
       await pgPool.query(
         `INSERT INTO positions (code, name, department_id, role_code)
@@ -2436,6 +2482,9 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     db.supportChannels.splice(idx, 1);
     writeDB(db);
+    if (pgPool) {
+      pgPool.query('DELETE FROM support_channels WHERE id = $1', [id]).catch(e => console.error(e));
+    }
     res.json({ success: true, message: 'Канал связи успешно удален' });
   });
 
@@ -2490,6 +2539,9 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     db.supportClients.splice(idx, 1);
     writeDB(db);
+    if (pgPool) {
+      pgPool.query('DELETE FROM support_clients WHERE id = $1', [id]).catch(e => console.error(e));
+    }
     res.json({ success: true, message: 'Клиент успешно удален' });
   });
 
@@ -2548,6 +2600,9 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     db.supportStores.splice(idx, 1);
     writeDB(db);
+    if (pgPool) {
+      pgPool.query('DELETE FROM support_stores WHERE id = $1', [id]).catch(e => console.error(e));
+    }
     res.json({ success: true, message: 'Магазин успешно удален' });
   });
 
@@ -2598,6 +2653,9 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     db.supportKinds.splice(idx, 1);
     writeDB(db);
+    if (pgPool) {
+      pgPool.query('DELETE FROM support_kinds WHERE id = $1', [id]).catch(e => console.error(e));
+    }
     res.json({ success: true, message: 'Вид тикета успешно удален' });
   });
 
@@ -2664,6 +2722,9 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     db.supportCountries.splice(idx, 1);
     writeDB(db);
+    if (pgPool) {
+      pgPool.query('DELETE FROM support_countries WHERE id = $1', [id]).catch(e => console.error(e));
+    }
     res.json({ success: true, message: 'Страна успешно удалена' });
   });
 
