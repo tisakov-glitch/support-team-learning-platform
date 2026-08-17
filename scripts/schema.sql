@@ -4,8 +4,8 @@
 
 -- 1. Departments Table
 CREATE TABLE IF NOT EXISTS departments (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+    id VARCHAR(10) PRIMARY KEY,
+    name VARCHAR(50) NOT NULL
 );
 
 -- 2. Roles Table
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS positions (
     code VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    department_id VARCHAR(64) REFERENCES departments(id) ON DELETE SET NULL,
+    department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
     role_code VARCHAR(64) REFERENCES roles(code) ON DELETE SET NULL,
     ranks JSONB DEFAULT '[]'::jsonb
 );
