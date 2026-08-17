@@ -417,6 +417,11 @@ async function runMigration() {
     if (Array.isArray(data.supportStores)) {
       console.log(`📥 Migrating ${data.supportStores.length} support stores...`);
       for (const st of data.supportStores) {
+        let countryId = st.countryId;
+        if (!countryId && st.country) {
+          const match = (data.supportCountries || []).find((c: any) => c.name === st.country || c.code === st.country);
+          if (match) countryId = match.id;
+        }
         await client.query(
           `INSERT INTO support_stores (id, name, client_id, country_id, country, code, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -427,8 +432,20 @@ async function runMigration() {
              country = EXCLUDED.country,
              code = EXCLUDED.code,
              status = EXCLUDED.status`,
-          [st.id, st.name, st.clientId, st.countryId || null, st.country, st.code || null, st.status || 'active']
+          [st.id, st.name, st.clientId, countryId || null, st.country, st.code || null, st.status || 'active']
         );
+      }
+
+      // Auto-fill country_id for any existing stores in PostgreSQL where country_id is NULL
+      try {
+        await client.query(`
+          UPDATE support_stores s
+          SET country_id = c.id
+          FROM support_countries c
+          WHERE s.country_id IS NULL AND (s.country = c.name OR s.country = c.code);
+        `);
+      } catch (e) {
+        // ignore
       }
     }
 
