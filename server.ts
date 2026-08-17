@@ -694,9 +694,18 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
 
     let supportCountries: SupportCountry[] = [];
     try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS support_countries (
+            id VARCHAR(64) PRIMARY KEY,
+            code VARCHAR(10) UNIQUE NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            status VARCHAR(64) NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
       supportCountries = (await client.query('SELECT id, code, name, status FROM support_countries')).rows;
     } catch (e) {
-      // Table support_countries might not exist yet
+      console.warn('Failed to ensure or query support_countries table:', e);
     }
 
     if (supportCountries.length === 0) {
