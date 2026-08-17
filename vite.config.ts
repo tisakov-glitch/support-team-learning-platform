@@ -11,6 +11,9 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      chunkSizeWarningLimit: 1500,
+    },
     server: {
       allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

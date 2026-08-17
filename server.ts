@@ -17,8 +17,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const appFilename = typeof import.meta?.url === 'string' ? fileURLToPath(import.meta.url) : (typeof __filename !== 'undefined' ? __filename : '');
-const appDirname = appFilename ? path.dirname(appFilename) : (typeof __dirname !== 'undefined' ? __dirname : process.cwd());
+const appFilename = typeof __filename !== 'undefined' ? __filename : process.cwd();
+const appDirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(appFilename);
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const DB_FILE = path.join(process.cwd(), 'database.json');
