@@ -418,15 +418,16 @@ async function runMigration() {
       console.log(`📥 Migrating ${data.supportStores.length} support stores...`);
       for (const st of data.supportStores) {
         await client.query(
-          `INSERT INTO support_stores (id, name, client_id, country, code, status)
-           VALUES ($1, $2, $3, $4, $5, $6)
+          `INSERT INTO support_stores (id, name, client_id, country_id, country, code, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (id) DO UPDATE SET
              name = EXCLUDED.name,
              client_id = EXCLUDED.client_id,
+             country_id = EXCLUDED.country_id,
              country = EXCLUDED.country,
              code = EXCLUDED.code,
              status = EXCLUDED.status`,
-          [st.id, st.name, st.clientId, st.country, st.code || null, st.status || 'active']
+          [st.id, st.name, st.clientId, st.countryId || null, st.country, st.code || null, st.status || 'active']
         );
       }
     }

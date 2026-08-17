@@ -140,27 +140,28 @@ CREATE TABLE IF NOT EXISTS support_clients (
     countries JSONB DEFAULT '[]'::jsonb
 );
 
--- 12. Support Stores Table
-CREATE TABLE IF NOT EXISTS support_stores (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    client_id VARCHAR(64) REFERENCES support_clients(id) ON DELETE CASCADE,
-    country VARCHAR(255) NOT NULL,
-    code VARCHAR(64),
-    status VARCHAR(64) DEFAULT 'active'
-);
-
--- 13. Support Kinds Table
-CREATE TABLE IF NOT EXISTS support_kinds (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
-);
-
--- 14. Support Countries Table
+-- 12. Support Countries Table
 CREATE TABLE IF NOT EXISTS support_countries (
     id VARCHAR(64) PRIMARY KEY,
     code VARCHAR(10) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(64) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 13. Support Stores Table
+CREATE TABLE IF NOT EXISTS support_stores (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    client_id VARCHAR(64) REFERENCES support_clients(id) ON DELETE CASCADE,
+    country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE SET NULL,
+    country VARCHAR(255) NOT NULL,
+    code VARCHAR(64),
+    status VARCHAR(64) DEFAULT 'active'
+);
+
+-- 14. Support Kinds Table
+CREATE TABLE IF NOT EXISTS support_kinds (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
 );

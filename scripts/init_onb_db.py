@@ -383,16 +383,17 @@ def populate_data(cursor, data):
     for st in stores:
         cursor.execute(
             """
-            INSERT INTO support_stores (id, name, client_id, country, code, status)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO support_stores (id, name, client_id, country_id, country, code, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 client_id = EXCLUDED.client_id,
+                country_id = EXCLUDED.country_id,
                 country = EXCLUDED.country,
                 code = EXCLUDED.code,
                 status = EXCLUDED.status;
             """,
-            (st["id"], st["name"], st.get("clientId"), st.get("country"), st.get("code"), st.get("status", "active"))
+            (st["id"], st["name"], st.get("clientId"), st.get("countryId"), st.get("country"), st.get("code"), st.get("status", "active"))
         )
 
     # 13. Support Kinds

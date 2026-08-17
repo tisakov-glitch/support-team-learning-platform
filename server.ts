@@ -424,16 +424,16 @@ const defaultDB: LocalDatabase = {
     { id: 'client-9', name: 'Aynimo-Kids', countries: ['Узбекистан'] }
   ],
   supportStores: [
-    { id: 'store-1', name: 'Koton Авиапарк', clientId: 'client-1', country: 'Россия' },
-    { id: 'store-2', name: 'Koton Минск', clientId: 'client-1', country: 'Беларусь' },
-    { id: 'store-3', name: 'OZZE Алматы', clientId: 'client-2', country: 'Казахстан' },
-    { id: 'store-4', name: 'LCW Москва', clientId: 'client-3', country: 'Россия' },
-    { id: 'store-5', name: 'Civil Астана', clientId: 'client-4', country: 'Казахстан' },
-    { id: 'store-6', name: 'Mittivoy Самарканд Дарвоза', clientId: 'client-5', country: 'Узбекистан' },
-    { id: 'store-7', name: 'Indenim Ташкент', clientId: 'client-6', country: 'Узбекистан' },
-    { id: 'store-8', name: 'DayMart Наманган', clientId: 'client-7', country: 'Узбекистан' },
-    { id: 'store-9', name: 'Aynimo Коканд', clientId: 'client-8', country: 'Узбекистан' },
-    { id: 'store-10', name: 'Aynimo-Kids Андижан', clientId: 'client-9', country: 'Узбекистан' }
+    { id: 'store-1', name: 'Koton Авиапарк', clientId: 'client-1', countryId: 'country-ru', country: 'Россия' },
+    { id: 'store-2', name: 'Koton Минск', clientId: 'client-1', countryId: 'country-by', country: 'Беларусь' },
+    { id: 'store-3', name: 'OZZE Алматы', clientId: 'client-2', countryId: 'country-kz', country: 'Казахстан' },
+    { id: 'store-4', name: 'LCW Москва', clientId: 'client-3', countryId: 'country-ru', country: 'Россия' },
+    { id: 'store-5', name: 'Civil Астана', clientId: 'client-4', countryId: 'country-kz', country: 'Казахстан' },
+    { id: 'store-6', name: 'Mittivoy Самарканд Дарвоза', clientId: 'client-5', countryId: 'country-uz', country: 'Узбекистан' },
+    { id: 'store-7', name: 'Indenim Ташкент', clientId: 'client-6', countryId: 'country-uz', country: 'Узбекистан' },
+    { id: 'store-8', name: 'DayMart Наманган', clientId: 'client-7', countryId: 'country-uz', country: 'Узбекистан' },
+    { id: 'store-9', name: 'Aynimo Коканд', clientId: 'client-8', countryId: 'country-uz', country: 'Узбекистан' },
+    { id: 'store-10', name: 'Aynimo-Kids Андижан', clientId: 'client-9', countryId: 'country-uz', country: 'Узбекистан' }
   ],
   supportKinds: [
     { id: 'kind-1', name: 'Информационная задача' },
@@ -689,7 +689,14 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
     const tickets = (await client.query('SELECT id, channel, client, country, creator_type as "creatorType", requester_name as "requesterName", subject, description, status, created_at as "createdAt", resolved_at as "resolvedAt", closed_at as "closedAt", assigned_to_id as "assignedToId", assigned_to_name as "assignedToName", resolution_comment as "resolutionComment", closed_by_id as "closedById", closed_by_name as "closedByName", system, module, type, action, kind, attachments, store_id as "storeId", store_name as "storeName", started_working_at as "startedWorkingAt", confirmed_at as "confirmedAt", confirmation_attachment as "confirmationAttachment" FROM tickets')).rows;
     const supportChannels = (await client.query('SELECT id, code, name FROM support_channels')).rows;
     const supportClients = (await client.query('SELECT id, name, countries FROM support_clients')).rows;
-    const supportStores = (await client.query('SELECT id, name, client_id as "clientId", country, code, status FROM support_stores')).rows;
+
+    try {
+      await client.query(`
+        ALTER TABLE support_stores ADD COLUMN IF NOT EXISTS country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE SET NULL;
+      `);
+    } catch (e) {}
+
+    const supportStores = (await client.query('SELECT id, name, client_id as "clientId", country_id as "countryId", country, code, status FROM support_stores')).rows;
     const supportKinds = (await client.query('SELECT id, name FROM support_kinds')).rows;
 
     let supportCountries: SupportCountry[] = [];
@@ -808,12 +815,12 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
     for (const st of data.supportStores || []) {
       try {
         await pgPool.query(
-          `INSERT INTO support_stores (id, name, client_id, country, code, status)
-           VALUES ($1, $2, $3, $4, $5, $6)
+          `INSERT INTO support_stores (id, name, client_id, country_id, country, code, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (id) DO UPDATE SET
-             name = EXCLUDED.name, client_id = EXCLUDED.client_id, country = EXCLUDED.country,
+             name = EXCLUDED.name, client_id = EXCLUDED.client_id, country_id = EXCLUDED.country_id, country = EXCLUDED.country,
              code = EXCLUDED.code, status = EXCLUDED.status`,
-          [st.id, st.name, st.clientId, st.country, st.code || null, st.status || 'active']
+          [st.id, st.name, st.clientId, st.countryId || null, st.country, st.code || null, st.status || 'active']
         );
       } catch (err) {}
     }
@@ -2552,18 +2559,22 @@ ${JSON.stringify(validKinds, null, 2)}
   });
 
   app.post('/api/support-stores', authenticateUser, requireAdmin, (req, res) => {
-    const { name, clientId, country, code, status } = req.body;
-    if (!name || !clientId || !country) {
+    const { name, clientId, country, countryId, code, status } = req.body;
+    if (!name || !clientId || (!country && !countryId)) {
       res.status(400).json({ error: 'Название магазина, ID клиента и страна обязательны' });
       return;
     }
     const db = readDB();
     if (!db.supportStores) db.supportStores = [];
+    const matchedCountry = (db.supportCountries || []).find(c => c.id === countryId || c.name === country || c.code === country);
+    const finalCountryName = matchedCountry ? matchedCountry.name : country;
+    const finalCountryId = matchedCountry ? matchedCountry.id : countryId;
     const newStore: SupportStore = {
       id: `store-${Date.now()}`,
       name: name.trim(),
       clientId,
-      country,
+      countryId: finalCountryId,
+      country: finalCountryName,
       code: code ? code.trim() : undefined,
       status: status || 'active'
     };
@@ -2574,7 +2585,7 @@ ${JSON.stringify(validKinds, null, 2)}
 
   app.put('/api/support-stores/:id', authenticateUser, requireAdmin, (req, res) => {
     const { id } = req.params;
-    const { name, clientId, country, code, status } = req.body;
+    const { name, clientId, country, countryId, code, status } = req.body;
     const db = readDB();
     const idx = db.supportStores.findIndex(s => s.id === id);
     if (idx === -1) {
@@ -2583,7 +2594,11 @@ ${JSON.stringify(validKinds, null, 2)}
     }
     if (name) db.supportStores[idx].name = name.trim();
     if (clientId) db.supportStores[idx].clientId = clientId;
-    if (country) db.supportStores[idx].country = country;
+    if (country || countryId) {
+      const matchedCountry = (db.supportCountries || []).find(c => c.id === countryId || c.name === country || c.code === country);
+      db.supportStores[idx].country = matchedCountry ? matchedCountry.name : (country || db.supportStores[idx].country);
+      db.supportStores[idx].countryId = matchedCountry ? matchedCountry.id : (countryId || db.supportStores[idx].countryId);
+    }
     db.supportStores[idx].code = code !== undefined ? (code ? code.trim() : undefined) : db.supportStores[idx].code;
     db.supportStores[idx].status = status !== undefined ? status : db.supportStores[idx].status;
     writeDB(db);

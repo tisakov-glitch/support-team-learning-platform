@@ -162,6 +162,7 @@ export interface SupportStore {
   id: string;
   name: string;
   clientId: string;
+  countryId?: string;
   country: string;
   code?: string;
   status?: 'active' | 'closed';
