@@ -4506,11 +4506,14 @@ export default function AdminDashboard({
                         {/* Form controls to add new binding */}
                         <div className="bg-slate-50/40 border border-slate-200 rounded-2xl p-4 space-y-3.5">
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                            Добавить привязку к должности
+                            Добавить привязку к должности и рангу
                           </p>
                           
-                          <div className="space-y-2.5">
+                          <div className="space-y-3">
                             <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Должность *
+                              </label>
                               <select
                                 value={tempBindingPosCode}
                                 onChange={(e) => {
@@ -4530,25 +4533,26 @@ export default function AdminDashboard({
 
                             {tempBindingPosCode && (() => {
                               const selectedPos = dbPositions.find(p => p.code === tempBindingPosCode);
-                              if (selectedPos?.ranks && selectedPos.ranks.length > 0) {
-                                return (
-                                  <div>
-                                    <select
-                                      value={tempBindingRank}
-                                      onChange={(e) => setTempBindingRank(e.target.value)}
-                                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer text-slate-800"
-                                    >
-                                      <option value="">Доступно всем рангам этой должности</option>
-                                      {selectedPos.ranks.map((rank) => (
-                                        <option key={rank} value={rank}>
-                                          {rank}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                );
-                              }
-                              return null;
+                              const posRanks = selectedPos?.ranks || [];
+                              return (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                    Привязка к рангу
+                                  </label>
+                                  <select
+                                    value={tempBindingRank}
+                                    onChange={(e) => setTempBindingRank(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer text-slate-800"
+                                  >
+                                    <option value="">Все ранги (доступно всем рангам этой должности)</option>
+                                    {posRanks.map((rank) => (
+                                      <option key={rank} value={rank}>
+                                        Конкретный ранг: {rank}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              );
                             })()}
 
                             <button
