@@ -1804,6 +1804,39 @@ async function startServer() {
     res.status(201).json(newTicket);
   });
 
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+
+function formatGeminiError(err: any): string {
+  let rawMsg = err?.message || String(err);
+  try {
+    if (typeof rawMsg === 'string' && rawMsg.trim().startsWith('{')) {
+      const parsed = JSON.parse(rawMsg.trim());
+      if (parsed?.error?.message) {
+        return parsed.error.message;
+      }
+    }
+  } catch (e) {
+    // Ignore JSON parse error
+  }
+  return rawMsg;
+}
+
+async function generateGeminiContent(ai: any, params: any) {
+  let lastError: any = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      return await ai.models.generateContent({
+        ...params,
+        model,
+      });
+    } catch (err: any) {
+      console.warn(`[Gemini] Модель ${model} вернула ошибку:`, err?.message || err);
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
   app.post('/api/tickets/voice-analyze', authenticateUser, async (req, res) => {
     try {
       const { audio, mimeType } = req.body;
@@ -1866,8 +1899,7 @@ ${JSON.stringify(validKinds, null, 2)}
 
       const cleanAudioBase64 = audio.includes('base64,') ? audio.split('base64,')[1] : audio;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+      const response = await generateGeminiContent(ai, {
         contents: [
           {
             inlineData: {
@@ -1907,7 +1939,8 @@ ${JSON.stringify(validKinds, null, 2)}
       res.json(JSON.parse(resultText.trim()));
     } catch (err: any) {
       console.error('Ошибка распознавания голоса Gemini:', err);
-      res.status(500).json({ error: `Не удалось распознать голосовое сообщение: ${err.message || err}` });
+      const cleanError = formatGeminiError(err);
+      res.status(500).json({ error: `Не удалось распознать голосовое сообщение: ${cleanError}` });
     }
   });
 
@@ -1973,8 +2006,7 @@ ${JSON.stringify(validKinds, null, 2)}
 
       const cleanImageBase64 = image.includes('base64,') ? image.split('base64,')[1] : image;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+      const response = await generateGeminiContent(ai, {
         contents: [
           {
             inlineData: {
@@ -2014,7 +2046,8 @@ ${JSON.stringify(validKinds, null, 2)}
       res.json(JSON.parse(resultText.trim()));
     } catch (err: any) {
       console.error('Ошибка распознавания изображения Gemini:', err);
-      res.status(500).json({ error: `Не удалось распознать скриншот: ${err.message || err}` });
+      const cleanError = formatGeminiError(err);
+      res.status(500).json({ error: `Не удалось распознать скриншот: ${cleanError}` });
     }
   });
 

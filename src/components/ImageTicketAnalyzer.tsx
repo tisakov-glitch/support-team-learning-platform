@@ -130,7 +130,10 @@ export const ImageTicketAnalyzer: React.FC<ImageTicketAnalyzerProps> = ({ onReco
     <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
       <div className="flex items-center gap-2 flex-wrap justify-end">
         {error && (
-          <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg font-medium border border-red-100 flex items-center gap-1 max-w-[200px] sm:max-w-xs animate-fade-in">
+          <span 
+            title={error}
+            className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg font-medium border border-red-100 flex items-center gap-1 max-w-[200px] sm:max-w-xs animate-fade-in"
+          >
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{error}</span>
           </span>
