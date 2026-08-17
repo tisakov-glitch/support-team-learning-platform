@@ -165,3 +165,11 @@ CREATE TABLE IF NOT EXISTS support_kinds (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL
 );
+
+-- Grant privileges if allowed
+DO $$ 
+BEGIN
+   EXECUTE 'GRANT ALL ON ALL TABLES IN SCHEMA public TO PUBLIC';
+EXCEPTION WHEN OTHERS THEN 
+   -- Ignore if permissions cannot be granted
+END $$;

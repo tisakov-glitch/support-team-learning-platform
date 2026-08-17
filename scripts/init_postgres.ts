@@ -150,14 +150,18 @@ async function runMigration() {
           for (let i = 0; i < pos.ranks.length; i++) {
             const rankName = pos.ranks[i];
             const rankId = `${pos.code}-${rankName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-            await client.query(
-              `INSERT INTO ranks (id, position_code, name, sort_order)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (id) DO UPDATE SET
-                 name = EXCLUDED.name,
-                 sort_order = EXCLUDED.sort_order`,
-              [rankId, pos.code, rankName, i + 1]
-            );
+            try {
+              await client.query(
+                `INSERT INTO ranks (id, position_code, name, sort_order)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (id) DO UPDATE SET
+                   name = EXCLUDED.name,
+                   sort_order = EXCLUDED.sort_order`,
+                [rankId, pos.code, rankName, i + 1]
+              );
+            } catch (err: any) {
+              console.warn(`⚠️ Warning: Could not migrate rank "${rankName}" for position ${pos.code}:`, err.message);
+            }
           }
         }
       }
