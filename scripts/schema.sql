@@ -155,3 +155,12 @@ CREATE TABLE IF NOT EXISTS support_kinds (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL
 );
+
+-- 14. Support Countries Table
+CREATE TABLE IF NOT EXISTS support_countries (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(10) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(64) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

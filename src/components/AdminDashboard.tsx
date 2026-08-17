@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Menu, Search, ChevronDown, ChevronUp, Ticket as TicketIcon,
   Paperclip, FileText, Download, Image, Edit3, Save, Bell
 } from 'lucide-react';
-import { Employee, SimulatedEmail, UserRole, DepartmentDefinition, RoleDefinition, PositionDefinition, Course, Lesson, LessonGrade, CourseBinding, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportChannel, SupportClient, SupportStore, SupportKind } from '../types';
+import { Employee, SimulatedEmail, UserRole, DepartmentDefinition, RoleDefinition, PositionDefinition, Course, Lesson, LessonGrade, CourseBinding, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportChannel, SupportClient, SupportStore, SupportKind, SupportCountry } from '../types';
 import { TICKET_CATEGORIES } from '../ticketCategories';
 import { VoiceTicketRecorder } from './VoiceTicketRecorder';
 import { ImageTicketAnalyzer } from './ImageTicketAnalyzer';
@@ -314,8 +314,16 @@ export default function AdminDashboard({
   const [supportClients, setSupportClients] = useState<SupportClient[]>([]);
   const [supportStores, setSupportStores] = useState<SupportStore[]>([]);
   const [supportKinds, setSupportKinds] = useState<SupportKind[]>([]);
+  const [supportCountries, setSupportCountries] = useState<SupportCountry[]>([]);
   const [isSupportLoading, setIsSupportLoading] = useState(false);
-  const [ticketAcademySubTab, setTicketAcademySubTab] = useState<'tickets' | 'channels' | 'clients' | 'stores' | 'kinds'>('tickets');
+  const [ticketAcademySubTab, setTicketAcademySubTab] = useState<'tickets' | 'channels' | 'clients' | 'stores' | 'kinds' | 'countries'>('tickets');
+
+  // Support Countries Form State
+  const [newCountryCode, setNewCountryCode] = useState('');
+  const [newCountryName, setNewCountryName] = useState('');
+  const [editingCountryId, setEditingCountryId] = useState<string | null>(null);
+  const [editingCountryCode, setEditingCountryCode] = useState('');
+  const [editingCountryName, setEditingCountryName] = useState('');
 
   // Support Kinds Form State
   const [newKindName, setNewKindName] = useState('');
@@ -527,11 +535,12 @@ export default function AdminDashboard({
       const token = localStorage.getItem('support_learning_token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const [channelsRes, clientsRes, storesRes, kindsRes] = await Promise.all([
+      const [channelsRes, clientsRes, storesRes, kindsRes, countriesRes] = await Promise.all([
         fetch('/api/support-channels', { headers }),
         fetch('/api/support-clients', { headers }),
         fetch('/api/support-stores', { headers }),
-        fetch('/api/support-kinds', { headers })
+        fetch('/api/support-kinds', { headers }),
+        fetch('/api/support-countries', { headers })
       ]);
 
       if (channelsRes.ok) {
@@ -550,10 +559,94 @@ export default function AdminDashboard({
         const kinds = await kindsRes.json();
         setSupportKinds(kinds);
       }
+      if (countriesRes.ok) {
+        const countries = await countriesRes.json();
+        setSupportCountries(countries);
+      }
     } catch (err) {
       console.error('Failed to fetch support infrastructure:', err);
     } finally {
       setIsSupportLoading(false);
+    }
+  };
+
+  const handleCreateCountry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCountryCode || !newCountryName) return;
+    setError('');
+    setSuccessMsg('');
+    try {
+      const token = localStorage.getItem('support_learning_token');
+      const response = await fetch('/api/support-countries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: newCountryCode, name: newCountryName })
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Не удалось создать страну');
+      }
+      const created = await response.json();
+      setSupportCountries(prev => [...prev, created]);
+      setNewCountryCode('');
+      setNewCountryName('');
+      setSuccessMsg('Страна успешно добавлена!');
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleUpdateCountry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCountryId || !editingCountryCode || !editingCountryName) return;
+    setError('');
+    setSuccessMsg('');
+    try {
+      const token = localStorage.getItem('support_learning_token');
+      const response = await fetch(`/api/support-countries/${editingCountryId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: editingCountryCode, name: editingCountryName })
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Не удалось обновить страну');
+      }
+      const updated = await response.json();
+      setSupportCountries(prev => prev.map(c => c.id === editingCountryId ? updated : c));
+      setEditingCountryId(null);
+      setEditingCountryCode('');
+      setEditingCountryName('');
+      setSuccessMsg('Страна успешно обновлена!');
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteCountry = async (id: string) => {
+    if (!confirm('Вы уверены, что хотите удалить эту страну?')) return;
+    setError('');
+    setSuccessMsg('');
+    try {
+      const token = localStorage.getItem('support_learning_token');
+      const response = await fetch(`/api/support-countries/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Не удалось удалить страну');
+      }
+      setSupportCountries(prev => prev.filter(c => c.id !== id));
+      setSuccessMsg('Страна успешно удалена!');
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -5892,6 +5985,17 @@ export default function AdminDashboard({
                 >
                   Виды тикетов
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTicketAcademySubTab('countries')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    ticketAcademySubTab === 'countries'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Страны
+                </button>
               </div>
             </div>
 
@@ -7305,7 +7409,7 @@ export default function AdminDashboard({
                       <div className="mb-3">
                         <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Быстрый выбор:</span>
                         <div className="flex flex-wrap gap-1">
-                          {['Россия', 'Казахстан', 'Беларусь', 'Узбекистан', 'Кыргызстан', 'Таджикистан', 'Армения', 'Азербайджан', 'Турция', 'Грузия'].map(country => {
+                          {(supportCountries.length > 0 ? supportCountries.map(c => c.name) : ['Россия', 'Казахстан', 'Беларусь', 'Узбекистан', 'Кыргызстан', 'Таджикистан', 'Армения', 'Азербайджан', 'Турция', 'Грузия']).map(country => {
                             const isSelected = (editingClientId ? editingClientCountries : newClientCountries).includes(country);
                             return (
                               <button
@@ -7796,6 +7900,140 @@ export default function AdminDashboard({
                         {supportKinds.length === 0 && (
                           <tr>
                             <td colSpan={2} className="p-8 text-center text-slate-400 font-semibold">Список видов тикетов пуст</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Support Countries Tab */}
+            {ticketAcademySubTab === 'countries' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start text-sm">
+                {/* Form to add or edit country */}
+                <div className="bg-white p-6 border border-slate-200 rounded-2xl shadow-xs space-y-4">
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-indigo-600" />
+                    {editingCountryId ? 'Редактировать страну' : 'Добавить новую страну'}
+                  </h3>
+                  <form onSubmit={editingCountryId ? handleUpdateCountry : handleCreateCountry} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Код страны (ISO 2 букв) *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={10}
+                        placeholder="Например: KZ, RU, UZ, GE"
+                        value={editingCountryId ? editingCountryCode : newCountryCode}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          if (editingCountryId) {
+                            setEditingCountryCode(val);
+                          } else {
+                            setNewCountryCode(val);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 placeholder-slate-400 uppercase"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Название страны *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Например: Казахстан, Россия"
+                        value={editingCountryId ? editingCountryName : newCountryName}
+                        onChange={(e) => {
+                          if (editingCountryId) {
+                            setEditingCountryName(e.target.value);
+                          } else {
+                            setNewCountryName(e.target.value);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 placeholder-slate-400"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      {editingCountryId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCountryId(null);
+                            setEditingCountryCode('');
+                            setEditingCountryName('');
+                          }}
+                          className="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Отмена
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                      >
+                        {editingCountryId ? 'Сохранить изменения' : 'Добавить'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* List of Countries */}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Справочник стран</h3>
+                    <span className="text-xs font-mono font-bold bg-slate-200 px-2 py-0.5 rounded-full text-slate-600">
+                      {supportCountries.length}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider bg-slate-50/20">
+                          <th className="p-4 w-24">Код</th>
+                          <th className="p-4">Название страны</th>
+                          <th className="p-4 text-right">Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                        {supportCountries.map(c => (
+                          <tr key={c.id} className="hover:bg-slate-50/40">
+                            <td className="p-4 font-mono font-bold text-indigo-700">
+                              <span className="px-2 py-1 bg-indigo-50 border border-indigo-100 rounded-md text-[11px]">
+                                {c.code}
+                              </span>
+                            </td>
+                            <td className="p-4 font-bold text-slate-900">{c.name}</td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCountryId(c.id);
+                                    setEditingCountryCode(c.code);
+                                    setEditingCountryName(c.name);
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-all cursor-pointer"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCountry(c.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {supportCountries.length === 0 && (
+                          <tr>
+                            <td colSpan={3} className="p-8 text-center text-slate-400 font-semibold">Справочник стран пуст</td>
                           </tr>
                         )}
                       </tbody>

@@ -8,7 +8,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { Employee, SimulatedEmail, Invitation, DepartmentDefinition, RoleDefinition, PositionDefinition, Course, Lesson, LessonGrade, Ticket, SupportChannel, SupportClient, SupportStore, SupportKind } from './src/types';
+import { Employee, SimulatedEmail, Invitation, DepartmentDefinition, RoleDefinition, PositionDefinition, Course, Lesson, LessonGrade, Ticket, SupportChannel, SupportClient, SupportStore, SupportKind, SupportCountry } from './src/types';
+
 import { initialCourses } from './src/initialCourses';
 import { GoogleGenAI, Type } from '@google/genai';
 import { TICKET_CATEGORIES } from './src/ticketCategories';
@@ -38,6 +39,7 @@ interface LocalDatabase {
   supportClients: SupportClient[];
   supportStores: SupportStore[];
   supportKinds: SupportKind[];
+  supportCountries: SupportCountry[];
 }
 
 // Default initial database content
@@ -439,6 +441,22 @@ const defaultDB: LocalDatabase = {
     { id: 'kind-3', name: 'Рутинная задача' },
     { id: 'kind-4', name: 'Ошибка системы' },
     { id: 'kind-5', name: 'Ошибка оператора' }
+  ],
+  supportCountries: [
+    { id: 'country-kz', code: 'KZ', name: 'Казахстан', status: 'active' },
+    { id: 'country-ru', code: 'RU', name: 'Россия', status: 'active' },
+    { id: 'country-uz', code: 'UZ', name: 'Узбекистан', status: 'active' },
+    { id: 'country-by', code: 'BY', name: 'Беларусь', status: 'active' },
+    { id: 'country-ge', code: 'GE', name: 'Грузия', status: 'active' },
+    { id: 'country-tr', code: 'TR', name: 'Турция', status: 'active' },
+    { id: 'country-ma', code: 'MA', name: 'Марокко', status: 'active' },
+    { id: 'country-rs', code: 'RS', name: 'Сербия', status: 'active' },
+    { id: 'country-mk', code: 'MK', name: 'Северная Македония', status: 'active' },
+    { id: 'country-ba', code: 'BA', name: 'Босния и Герцеговина', status: 'active' },
+    { id: 'country-hu', code: 'HU', name: 'Венгрия', status: 'active' },
+    { id: 'country-in', code: 'IN', name: 'Индия', status: 'active' },
+    { id: 'country-us', code: 'US', name: 'Америка', status: 'active' },
+    { id: 'country-ro', code: 'RO', name: 'Румыния', status: 'active' }
   ]
 };
 
@@ -449,6 +467,11 @@ function readDB(): LocalDatabase {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       const parsed = JSON.parse(data);
       let updated = false;
+
+      if (!parsed.supportCountries || parsed.supportCountries.length === 0) {
+        parsed.supportCountries = defaultDB.supportCountries;
+        updated = true;
+      }
 
       // Migrate roles, departments, positions if not existing
       if (!parsed.departments) {
@@ -669,6 +692,29 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
     const supportStores = (await client.query('SELECT id, name, client_id as "clientId", country, code, status FROM support_stores')).rows;
     const supportKinds = (await client.query('SELECT id, name FROM support_kinds')).rows;
 
+    let supportCountries: SupportCountry[] = [];
+    try {
+      supportCountries = (await client.query('SELECT id, code, name, status FROM support_countries')).rows;
+    } catch (e) {
+      // Table support_countries might not exist yet
+    }
+
+    if (supportCountries.length === 0) {
+      supportCountries = defaultDB.supportCountries || [];
+      for (const sc of supportCountries) {
+        try {
+          await client.query(
+            `INSERT INTO support_countries (id, code, name, status)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, status = EXCLUDED.status`,
+            [sc.id, sc.code, sc.name, sc.status || 'active']
+          );
+        } catch (err) {
+          // ignore
+        }
+      }
+    }
+
     const employees: Record<string, Employee & { password?: string }> = {};
     for (const emp of employeesRows) {
       employees[emp.id] = {
@@ -701,7 +747,8 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       supportChannels,
       supportClients,
       supportStores,
-      supportKinds
+      supportKinds,
+      supportCountries
     };
   } catch (err) {
     console.error('Failed to load from PostgreSQL:', err);
@@ -714,6 +761,18 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
 async function saveDBToPostgresAsync(data: LocalDatabase) {
   if (!pgPool) return;
   try {
+    for (const sc of data.supportCountries || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO support_countries (id, code, name, status)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, status = EXCLUDED.status`,
+          [sc.id, sc.code, sc.name, sc.status || 'active']
+        );
+      } catch (err) {
+        // ignore if table not created yet
+      }
+    }
     for (const pos of data.positions || []) {
       await pgPool.query(
         `INSERT INTO positions (code, name, department_id, role_code)
@@ -2531,6 +2590,72 @@ ${JSON.stringify(validKinds, null, 2)}
     db.supportKinds.splice(idx, 1);
     writeDB(db);
     res.json({ success: true, message: 'Вид тикета успешно удален' });
+  });
+
+  // --- Support Countries CRUD ---
+  app.get('/api/support-countries', authenticateUser, (req, res) => {
+    const db = readDB();
+    res.json(db.supportCountries || []);
+  });
+
+  app.post('/api/support-countries', authenticateUser, requireAdmin, (req, res) => {
+    const { code, name } = req.body;
+    if (!code || !name) {
+      res.status(400).json({ error: 'Код страны и название обязательны' });
+      return;
+    }
+    const db = readDB();
+    if (!db.supportCountries) db.supportCountries = [];
+    const cleanCode = code.trim().toUpperCase();
+    const cleanName = name.trim();
+    if (db.supportCountries.some(c => c.code === cleanCode)) {
+      res.status(400).json({ error: `Страна с кодом "${cleanCode}" уже существует` });
+      return;
+    }
+    const newCountry: SupportCountry = {
+      id: `country-${cleanCode.toLowerCase()}`,
+      code: cleanCode,
+      name: cleanName,
+      status: 'active'
+    };
+    db.supportCountries.push(newCountry);
+    writeDB(db);
+    res.status(201).json(newCountry);
+  });
+
+  app.put('/api/support-countries/:id', authenticateUser, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const { code, name, status } = req.body;
+    const db = readDB();
+    const idx = db.supportCountries.findIndex(c => c.id === id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Страна не найдена' });
+      return;
+    }
+    if (code) db.supportCountries[idx].code = code.trim().toUpperCase();
+    if (name) db.supportCountries[idx].name = name.trim();
+    if (status) db.supportCountries[idx].status = status;
+    writeDB(db);
+    res.json(db.supportCountries[idx]);
+  });
+
+  app.delete('/api/support-countries/:id', authenticateUser, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const db = readDB();
+    const idx = db.supportCountries.findIndex(c => c.id === id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Страна не найдена' });
+      return;
+    }
+    const countryObj = db.supportCountries[idx];
+    const isUsedInStores = (db.supportStores || []).some(s => s.country === countryObj.name);
+    if (isUsedInStores) {
+      res.status(400).json({ error: `Нельзя удалить страну "${countryObj.name}", так как к ней привязаны действующие магазины.` });
+      return;
+    }
+    db.supportCountries.splice(idx, 1);
+    writeDB(db);
+    res.json({ success: true, message: 'Страна успешно удалена' });
   });
 
 

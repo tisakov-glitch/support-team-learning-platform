@@ -444,6 +444,19 @@ async function runMigration() {
       }
     }
 
+    // 16. Populate Support Countries
+    if (Array.isArray(data.supportCountries)) {
+      console.log(`📥 Migrating ${data.supportCountries.length} support countries...`);
+      for (const sc of data.supportCountries) {
+        await client.query(
+          `INSERT INTO support_countries (id, code, name, status)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, status = EXCLUDED.status`,
+          [sc.id, sc.code, sc.name, sc.status || 'active']
+        );
+      }
+    }
+
     console.log('🎉 Data migration to PostgreSQL completed successfully!');
   } catch (err: any) {
     console.error('❌ Migration failed:', err);

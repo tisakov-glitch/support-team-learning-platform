@@ -146,6 +146,13 @@ export interface SupportClient {
   countries: string[];
 }
 
+export interface SupportCountry {
+  id: string;
+  code: string;
+  name: string;
+  status?: 'active' | 'archived';
+}
+
 export interface SupportKind {
   id: string;
   name: string;

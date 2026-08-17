@@ -408,6 +408,19 @@ def populate_data(cursor, data):
             (k["id"], k["name"])
         )
 
+    # 14. Support Countries
+    scountries = data.get("supportCountries", [])
+    print(f"  -> Migrating {len(scountries)} support countries...")
+    for sc in scountries:
+        cursor.execute(
+            """
+            INSERT INTO support_countries (id, code, name, status)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, status = EXCLUDED.status;
+            """,
+            (sc["id"], sc["code"], sc["name"], sc.get("status", "active"))
+        )
+
 
 def main():
     print(f"🚀 Starting Python PostgreSQL setup for database '{TARGET_DB}'...")
