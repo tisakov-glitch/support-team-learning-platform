@@ -107,28 +107,41 @@ def populate_data(cursor, data):
             (r["code"], r["name"], r.get("systemRole", "employee"))
         )
 
-    # 3. Positions
+    # 3. Positions & Ranks
     positions = data.get("positions", [])
-    print(f"  -> Migrating {len(positions)} positions...")
+    print(f"  -> Migrating {len(positions)} positions and ranks...")
     for p in positions:
         cursor.execute(
             """
-            INSERT INTO positions (code, name, department_id, role_code, ranks)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO positions (code, name, department_id, role_code)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (code) DO UPDATE SET
                 name = EXCLUDED.name,
                 department_id = EXCLUDED.department_id,
-                role_code = EXCLUDED.role_code,
-                ranks = EXCLUDED.ranks;
+                role_code = EXCLUDED.role_code;
             """,
             (
                 p["code"],
                 p["name"],
                 p.get("departmentId"),
-                p.get("roleCode"),
-                json.dumps(p.get("ranks", []))
+                p.get("roleCode")
             )
         )
+
+        ranks = p.get("ranks", [])
+        if isinstance(ranks, list):
+            for idx, r_name in enumerate(ranks):
+                r_id = f"{p['code']}-{r_name.lower().replace(' ', '-')}"
+                cursor.execute(
+                    """
+                    INSERT INTO ranks (id, position_code, name, sort_order)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        sort_order = EXCLUDED.sort_order;
+                    """,
+                    (r_id, p["code"], r_name, idx + 1)
+                )
 
     # 4. Employees
     employees = data.get("employees", {})

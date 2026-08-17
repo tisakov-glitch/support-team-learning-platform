@@ -20,8 +20,16 @@ CREATE TABLE IF NOT EXISTS positions (
     code VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
-    role_code VARCHAR(64) REFERENCES roles(code) ON DELETE SET NULL,
-    ranks JSONB DEFAULT '[]'::jsonb
+    role_code VARCHAR(64) REFERENCES roles(code) ON DELETE SET NULL
+);
+
+-- 4. Ranks Table
+CREATE TABLE IF NOT EXISTS ranks (
+    id VARCHAR(64) PRIMARY KEY,
+    position_code VARCHAR(64) NOT NULL REFERENCES positions(code) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 4. Employees Table

@@ -127,26 +127,39 @@ async function runMigration() {
       }
     }
 
-    // 5. Populate Positions
+    // 5. Populate Positions and Ranks
     if (Array.isArray(data.positions)) {
-      console.log(`📥 Migrating ${data.positions.length} positions...`);
+      console.log(`📥 Migrating ${data.positions.length} positions and ranks...`);
       for (const pos of data.positions) {
         await client.query(
-          `INSERT INTO positions (code, name, department_id, role_code, ranks)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO positions (code, name, department_id, role_code)
+           VALUES ($1, $2, $3, $4)
            ON CONFLICT (code) DO UPDATE SET
              name = EXCLUDED.name,
              department_id = EXCLUDED.department_id,
-             role_code = EXCLUDED.role_code,
-             ranks = EXCLUDED.ranks`,
+             role_code = EXCLUDED.role_code`,
           [
             pos.code,
             pos.name,
             pos.departmentId || null,
-            pos.roleCode || null,
-            JSON.stringify(pos.ranks || [])
+            pos.roleCode || null
           ]
         );
+
+        if (Array.isArray(pos.ranks) && pos.ranks.length > 0) {
+          for (let i = 0; i < pos.ranks.length; i++) {
+            const rankName = pos.ranks[i];
+            const rankId = `${pos.code}-${rankName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            await client.query(
+              `INSERT INTO ranks (id, position_code, name, sort_order)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (id) DO UPDATE SET
+                 name = EXCLUDED.name,
+                 sort_order = EXCLUDED.sort_order`,
+              [rankId, pos.code, rankName, i + 1]
+            );
+          }
+        }
       }
     }
 

@@ -606,7 +606,23 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
   try {
     const depts = (await client.query('SELECT id, name FROM departments')).rows;
     const roles = (await client.query('SELECT code, name, system_role as "systemRole" FROM roles')).rows;
-    const positions = (await client.query('SELECT code, name, department_id as "departmentId", role_code as "roleCode", ranks FROM positions')).rows;
+    const positions = (await client.query('SELECT code, name, department_id as "departmentId", role_code as "roleCode" FROM positions')).rows;
+    
+    let ranksRows: any[] = [];
+    try {
+      ranksRows = (await client.query('SELECT id, position_code as "positionCode", name, sort_order as "sortOrder" FROM ranks ORDER BY sort_order ASC, name ASC')).rows;
+    } catch (e) {
+      // Ignore if ranks table not created yet
+    }
+    const ranksByPos: Record<string, string[]> = {};
+    for (const r of ranksRows) {
+      if (!ranksByPos[r.positionCode]) ranksByPos[r.positionCode] = [];
+      ranksByPos[r.positionCode].push(r.name);
+    }
+    for (const pos of positions) {
+      pos.ranks = ranksByPos[pos.code] || pos.ranks || [];
+    }
+
     const employeesRows = (await client.query('SELECT id, email, name, role, status, created_at as "createdAt", password, profile FROM employees')).rows;
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
@@ -663,6 +679,34 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
 async function saveDBToPostgresAsync(data: LocalDatabase) {
   if (!pgPool) return;
   try {
+    for (const pos of data.positions || []) {
+      await pgPool.query(
+        `INSERT INTO positions (code, name, department_id, role_code)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (code) DO UPDATE SET
+           name = EXCLUDED.name, department_id = EXCLUDED.department_id, role_code = EXCLUDED.role_code`,
+        [pos.code, pos.name, pos.departmentId || null, pos.roleCode || null]
+      );
+
+      try {
+        await pgPool.query(`DELETE FROM ranks WHERE position_code = $1`, [pos.code]);
+        if (Array.isArray(pos.ranks) && pos.ranks.length > 0) {
+          for (let i = 0; i < pos.ranks.length; i++) {
+            const rName = pos.ranks[i];
+            const rId = `${pos.code}-${rName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            await pgPool.query(
+              `INSERT INTO ranks (id, position_code, name, sort_order)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order`,
+              [rId, pos.code, rName, i + 1]
+            );
+          }
+        }
+      } catch (e) {
+        // Table ranks might not exist yet
+      }
+    }
+
     const empList = Object.values(data.employees || {});
     for (const emp of empList) {
       await pgPool.query(
