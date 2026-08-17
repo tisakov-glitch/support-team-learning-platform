@@ -465,6 +465,15 @@ function readDB(): LocalDatabase {
       if (!parsed.positions) {
         parsed.positions = defaultDB.positions;
         updated = true;
+      } else {
+        // Ensure default positions have their ranks restored if empty
+        for (const defPos of defaultDB.positions) {
+          const p = parsed.positions.find((pos: any) => pos.code === defPos.code);
+          if (p && defPos.ranks && (!p.ranks || p.ranks.length === 0)) {
+            p.ranks = defPos.ranks;
+            updated = true;
+          }
+        }
       }
       // Ensure all default/system courses are synchronized and up-to-date
       if (!parsed.courses) {
@@ -619,8 +628,34 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       if (!ranksByPos[r.positionCode]) ranksByPos[r.positionCode] = [];
       ranksByPos[r.positionCode].push(r.name);
     }
+
+    const defaultPositions = defaultDB.positions || [];
     for (const pos of positions) {
-      pos.ranks = ranksByPos[pos.code] || pos.ranks || [];
+      if (ranksByPos[pos.code] && ranksByPos[pos.code].length > 0) {
+        pos.ranks = ranksByPos[pos.code];
+      } else {
+        const defPos = defaultPositions.find((p: any) => p.code === pos.code);
+        if (defPos && defPos.ranks && defPos.ranks.length > 0) {
+          pos.ranks = defPos.ranks;
+          // Auto-seed into PostgreSQL ranks table
+          for (let i = 0; i < defPos.ranks.length; i++) {
+            const rName = defPos.ranks[i];
+            const rId = `${pos.code}-${rName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            try {
+              await client.query(
+                `INSERT INTO ranks (id, position_code, name, sort_order)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order`,
+                [rId, pos.code, rName, i + 1]
+              );
+            } catch (e) {
+              // Ignore if ranks table is not available
+            }
+          }
+        } else {
+          pos.ranks = [];
+        }
+      }
     }
 
     const employeesRows = (await client.query('SELECT id, email, name, role, status, created_at as "createdAt", password, profile FROM employees')).rows;
