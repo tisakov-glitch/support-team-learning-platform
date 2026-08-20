@@ -862,7 +862,18 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       }
     }
 
-    const employeesRows = (await client.query('SELECT id, email, name, role, status, created_at as "createdAt", password, profile FROM employees')).rows;
+    const employeesRows = (await client.query(`
+      SELECT 
+        e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+        e.role, e.status, e.created_at as "createdAt", e.password,
+        e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+        e.rank_id as "rankId", e.rank_name as "rankName", e.bio,
+        e.specializations, e.course_started_dates as "courseStartedDates",
+        d.name as "departmentName", p.name as "positionName"
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN positions p ON e.position_code = p.code
+    `)).rows;
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
     const courses = (await client.query('SELECT id, title, description, position_code as "positionCode", position_name as "positionName", rank, bindings, lessons, created_at as "createdAt", study_duration_days as "studyDurationDays", exam_duration_days as "examDurationDays" FROM courses')).rows;
@@ -980,15 +991,41 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
 
     const employees: Record<string, Employee & { password?: string }> = {};
     for (const emp of employeesRows) {
+      const fullName = [emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.email;
+      const profile = {
+        phone: emp.phone || '',
+        department: emp.departmentName || '',
+        departmentId: emp.departmentId || '',
+        positionCode: emp.positionCode || '',
+        positionName: emp.positionName || '',
+        rank: emp.rankName || '',
+        rankId: emp.rankId || '',
+        bio: emp.bio || '',
+        specializations: emp.specializations || [],
+        courseStartedDates: emp.courseStartedDates || {}
+      };
+
       employees[emp.id] = {
         id: emp.id,
         email: emp.email,
-        name: emp.name,
+        firstName: emp.firstName || '',
+        lastName: emp.lastName || '',
+        name: fullName,
         role: emp.role,
         status: emp.status,
         createdAt: emp.createdAt,
         password: emp.password,
-        profile: emp.profile || {}
+        phone: emp.phone || '',
+        departmentId: emp.departmentId || '',
+        department: emp.departmentName || '',
+        positionCode: emp.positionCode || '',
+        positionName: emp.positionName || '',
+        rankId: emp.rankId || '',
+        rank: emp.rankName || '',
+        bio: emp.bio || '',
+        specializations: emp.specializations || [],
+        courseStartedDates: emp.courseStartedDates || {},
+        profile: profile
       };
     }
 
@@ -1129,13 +1166,57 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
 
     const empList = Object.values(data.employees || {});
     for (const emp of empList) {
+      const nameParts = (emp.name || '').trim().split(/\s+/);
+      const firstName = emp.firstName || nameParts[0] || '';
+      const lastName = emp.lastName || nameParts.slice(1).join(' ') || '';
+      const phone = emp.phone || emp.profile?.phone || null;
+      const deptId = emp.departmentId || emp.profile?.departmentId || null;
+      const posCode = emp.positionCode || emp.profile?.positionCode || null;
+      const rankName = emp.rank || emp.profile?.rank || null;
+      const rankId = emp.rankId || emp.profile?.rankId || null;
+      const bio = emp.bio || emp.profile?.bio || null;
+      const specs = emp.specializations || emp.profile?.specializations || [];
+      const courseStarts = JSON.stringify(emp.courseStartedDates || emp.profile?.courseStartedDates || {});
+
       await pgPool.query(
-        `INSERT INTO employees (id, email, name, role, status, created_at, password, profile)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO employees (
+           id, email, first_name, last_name, role, status, created_at, password,
+           phone, department_id, position_code, rank_id, rank_name, bio, specializations, course_started_dates
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          ON CONFLICT (id) DO UPDATE SET
-           email = EXCLUDED.email, name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status,
-           password = EXCLUDED.password, profile = EXCLUDED.profile`,
-        [emp.id, emp.email, emp.name, emp.role, emp.status, emp.createdAt, emp.password || 'password123', JSON.stringify(emp.profile || {})]
+           email = EXCLUDED.email,
+           first_name = EXCLUDED.first_name,
+           last_name = EXCLUDED.last_name,
+           role = EXCLUDED.role,
+           status = EXCLUDED.status,
+           password = EXCLUDED.password,
+           phone = EXCLUDED.phone,
+           department_id = EXCLUDED.department_id,
+           position_code = EXCLUDED.position_code,
+           rank_id = EXCLUDED.rank_id,
+           rank_name = EXCLUDED.rank_name,
+           bio = EXCLUDED.bio,
+           specializations = EXCLUDED.specializations,
+           course_started_dates = EXCLUDED.course_started_dates`,
+        [
+          emp.id,
+          emp.email,
+          firstName,
+          lastName,
+          emp.role,
+          emp.status,
+          emp.createdAt,
+          emp.password || 'password123',
+          phone,
+          deptId,
+          posCode,
+          rankId,
+          rankName,
+          bio,
+          specs,
+          courseStarts
+        ]
       );
     }
 
@@ -1324,9 +1405,9 @@ async function startServer() {
 
   // 4. Create New Employee & Send Invitation (Admin only)
   app.post('/api/employees', authenticateUser, requireAdmin, (req, res) => {
-    const { name, email, department, specializations, phone, bio, positionCode, positionName, role, rank } = req.body;
+    const { name, firstName, lastName, email, department, departmentId, specializations, phone, bio, positionCode, positionName, role, rank, rankId } = req.body;
 
-    if (!name || !email) {
+    if (!email || (!name && !firstName)) {
       res.status(400).json({ error: 'Имя и Email обязательны для заполнения' });
       return;
     }
@@ -1338,26 +1419,49 @@ async function startServer() {
       return;
     }
 
+    let fName = firstName || '';
+    let lName = lastName || '';
+    if (!fName && name) {
+      const parts = name.trim().split(/\s+/);
+      fName = parts[0] || '';
+      lName = parts.slice(1).join(' ') || '';
+    }
+    const fullName = [fName, lName].filter(Boolean).join(' ') || email;
+
     const id = 'emp-' + Math.random().toString(36).substr(2, 9);
     const token = 'token-' + Math.random().toString(36).substr(2, 16);
+
+    const profileObj = {
+      phone: phone || '',
+      department: department || 'RetMind Support',
+      departmentId: departmentId || '',
+      specializations: specializations || [],
+      bio: bio || '',
+      positionCode: positionCode || '13',
+      positionName: positionName || 'Support Specialist',
+      rank: rank || '',
+      rankId: rankId || ''
+    };
 
     const newEmployee: Employee = {
       id,
       email,
-      name,
+      firstName: fName,
+      lastName: lName,
+      name: fullName,
       role: role || 'employee',
       status: 'pending',
       createdAt: new Date().toISOString(),
-      profile: {
-        phone: phone || '',
-        department: department || 'RetMind Support',
-        specializations: specializations || [],
-        bio: bio || '',
-        avatarStyle: name.toLowerCase().replace(/\s+/g, '-'),
-        positionCode: positionCode || '13',
-        positionName: positionName || 'Support Specialist',
-        rank: rank || ''
-      }
+      phone: phone || '',
+      departmentId: departmentId || '',
+      department: department || 'RetMind Support',
+      positionCode: positionCode || '13',
+      positionName: positionName || 'Support Specialist',
+      rank: rank || '',
+      rankId: rankId || '',
+      bio: bio || '',
+      specializations: specializations || [],
+      profile: profileObj
     };
 
     // Save user
@@ -1380,7 +1484,7 @@ async function startServer() {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
     const invitationLink = `${protocol}://${host}/onboarding/${token}`;
     const emailSubject = 'Ваша учетная запись сотрудника поддержки готова';
-    const emailBody = `Здравствуйте, ${name}!\n\nВас зарегистрировали на обучающей платформе поддержки RetMind.\nДля настройки учетной записи, создания пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nСсылка действительна в течение 7 дней.\n\nС уважением,\nКоманда Support Team Learning`;
+    const emailBody = `Здравствуйте, ${fullName}!\n\nВас зарегистрировали на обучающей платформе поддержки RetMind.\nДля настройки учетной записи, создания пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nСсылка действительна в течение 7 дней.\n\nС уважением,\nКоманда Support Team Learning`;
 
     const emailHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; padding: 40px 20px; color: #f8fafc;">
@@ -1389,7 +1493,7 @@ async function startServer() {
             <h2 style="color: #14b8a6; margin: 0; font-size: 24px; font-weight: 800;">Support Team Learning</h2>
             <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">Обучающая платформа службы поддержки RetMind</p>
           </div>
-          <h3 style="color: #ffffff; font-size: 18px; margin-bottom: 16px;">Здравствуйте, ${name}!</h3>
+          <h3 style="color: #ffffff; font-size: 18px; margin-bottom: 16px;">Здравствуйте, ${fullName}!</h3>
           <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
             Вас успешно зарегистрировали в системе. Для настройки учетной записи, создания персонального пароля и активации аккаунта нажмите на кнопку ниже:
           </p>
@@ -1442,7 +1546,7 @@ async function startServer() {
   app.put('/api/employees/:id', authenticateUser, (req, res) => {
     const { id } = req.params;
     const currentUser = (req as any).user as Employee;
-    const { name, email, department, specializations, phone, bio, positionCode, positionName, role, rank } = req.body;
+    const { name, firstName, lastName, email, department, departmentId, specializations, phone, bio, positionCode, positionName, role, rank, rankId } = req.body;
 
     // Authorization guard: Admin/Manager can edit any, Employee can edit self
     if (currentUser.role !== 'admin' && currentUser.role !== 'manager' && currentUser.id !== id) {
@@ -1457,10 +1561,18 @@ async function startServer() {
       return;
     }
 
-    // Admins/Managers can update emails and names, users can update profiles and names
-    if (name) targetEmployee.name = name;
+    if (firstName !== undefined) targetEmployee.firstName = firstName;
+    if (lastName !== undefined) targetEmployee.lastName = lastName;
+    if (name) {
+      if (!firstName && !lastName) {
+        const parts = name.trim().split(/\s+/);
+        targetEmployee.firstName = parts[0] || '';
+        targetEmployee.lastName = parts.slice(1).join(' ') || '';
+      }
+    }
+    targetEmployee.name = [targetEmployee.firstName, targetEmployee.lastName].filter(Boolean).join(' ') || targetEmployee.name;
+
     if ((currentUser.role === 'admin' || currentUser.role === 'manager') && email) {
-      // Check email uniqueness if modified
       if (email.toLowerCase() !== targetEmployee.email.toLowerCase()) {
         const emailExists = Object.values(db.employees).some(emp => emp.id !== id && emp.email.toLowerCase() === email.toLowerCase());
         if (emailExists) {
@@ -1475,16 +1587,28 @@ async function startServer() {
       targetEmployee.role = role;
     }
 
-    // Ensure profile structure
+    if (phone !== undefined) targetEmployee.phone = phone;
+    if (department !== undefined) targetEmployee.department = department;
+    if (departmentId !== undefined) targetEmployee.departmentId = departmentId;
+    if (positionCode !== undefined) targetEmployee.positionCode = positionCode;
+    if (positionName !== undefined) targetEmployee.positionName = positionName;
+    if (rank !== undefined) targetEmployee.rank = rank;
+    if (rankId !== undefined) targetEmployee.rankId = rankId;
+    if (bio !== undefined) targetEmployee.bio = bio;
+    if (specializations !== undefined) targetEmployee.specializations = specializations;
+
+    // Update profile getter compatibility object
     targetEmployee.profile = {
       ...targetEmployee.profile,
-      phone: phone !== undefined ? phone : targetEmployee.profile.phone,
-      department: department !== undefined ? department : targetEmployee.profile.department,
-      specializations: specializations !== undefined ? specializations : targetEmployee.profile.specializations,
-      bio: bio !== undefined ? bio : targetEmployee.profile.bio,
-      positionCode: positionCode !== undefined ? positionCode : targetEmployee.profile.positionCode,
-      positionName: positionName !== undefined ? positionName : targetEmployee.profile.positionName,
-      rank: rank !== undefined ? rank : targetEmployee.profile.rank,
+      phone: targetEmployee.phone || '',
+      department: targetEmployee.department || '',
+      departmentId: targetEmployee.departmentId || '',
+      positionCode: targetEmployee.positionCode || '',
+      positionName: targetEmployee.positionName || '',
+      rank: targetEmployee.rank || '',
+      rankId: targetEmployee.rankId || '',
+      bio: targetEmployee.bio || '',
+      specializations: targetEmployee.specializations || []
     };
 
     db.employees[id] = targetEmployee;

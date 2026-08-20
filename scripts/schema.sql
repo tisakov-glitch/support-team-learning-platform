@@ -32,17 +32,62 @@ CREATE TABLE IF NOT EXISTS ranks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Employees Table
+-- 4. Employees Table (Normalized)
 CREATE TABLE IF NOT EXISTS employees (
     id VARCHAR(64) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL DEFAULT '',
+    last_name VARCHAR(255) NOT NULL DEFAULT '',
     role VARCHAR(64) NOT NULL,
     status VARCHAR(64) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     password VARCHAR(255) NOT NULL DEFAULT 'password123',
-    profile JSONB DEFAULT '{}'::jsonb
+    phone VARCHAR(64),
+    department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
+    position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL,
+    rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL,
+    rank_name VARCHAR(255),
+    bio TEXT,
+    specializations TEXT[] DEFAULT '{}',
+    course_started_dates JSONB DEFAULT '{}'::jsonb
 );
+
+-- Automatic DDL Migrations for employees table normalization
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
+
+-- Populate first_name, last_name, and normalize profile JSONB
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name') THEN
+        UPDATE employees SET 
+            first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
+            last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
+        WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
+
+        ALTER TABLE employees DROP COLUMN IF EXISTS name;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile') THEN
+        UPDATE employees SET
+            phone = COALESCE(phone, profile->>'phone'),
+            department_id = COALESCE(department_id, profile->>'departmentId', (SELECT id FROM departments WHERE name = profile->>'department' LIMIT 1)),
+            position_code = COALESCE(position_code, profile->>'positionCode'),
+            rank_name = COALESCE(rank_name, profile->>'rank'),
+            bio = COALESCE(bio, profile->>'bio'),
+            course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
+        
+        ALTER TABLE employees DROP COLUMN IF EXISTS profile;
+    END IF;
+END $$;
 
 -- 5. Emails Table
 CREATE TABLE IF NOT EXISTS emails (

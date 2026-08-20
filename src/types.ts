@@ -57,10 +57,22 @@ export interface EmployeeProfile {
 export interface Employee {
   id: string;
   email: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   role: UserRole;
   status: 'pending' | 'active';
   createdAt: string;
+  phone?: string;
+  departmentId?: string;
+  department?: string;
+  positionCode?: string;
+  positionName?: string;
+  rankId?: string;
+  rank?: string;
+  bio?: string;
+  specializations?: string[];
+  courseStartedDates?: Record<string, string>;
   profile: EmployeeProfile;
 }
 

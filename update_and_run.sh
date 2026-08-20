@@ -32,8 +32,20 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
-echo "🗄️ Applying PostgreSQL database DDL migrations..."
+echo "🗄️ Applying PostgreSQL database DDL migrations (employees profile normalization)..."
 if [ -n "$DATABASE_URL" ]; then
+  psql "$DATABASE_URL" -c "
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
+  " 2>/dev/null || true
   psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
 else
   psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true

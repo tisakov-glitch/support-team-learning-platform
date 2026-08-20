@@ -167,31 +167,62 @@ async function runMigration() {
       }
     }
 
-    // 6. Populate Employees
+    // 6. Populate Employees (Normalized columns)
     if (data.employees && typeof data.employees === 'object') {
       const employeesList = Object.values(data.employees) as any[];
       console.log(`📥 Migrating ${employeesList.length} employees...`);
       for (const emp of employeesList) {
+        const nameParts = (emp.name || '').trim().split(/\s+/);
+        const firstName = emp.firstName || nameParts[0] || '';
+        const lastName = emp.lastName || nameParts.slice(1).join(' ') || '';
+        const phone = emp.phone || emp.profile?.phone || null;
+        const deptId = emp.departmentId || emp.profile?.departmentId || null;
+        const posCode = emp.positionCode || emp.profile?.positionCode || null;
+        const rankName = emp.rank || emp.profile?.rank || null;
+        const rankId = emp.rankId || emp.profile?.rankId || null;
+        const bio = emp.bio || emp.profile?.bio || null;
+        const specs = emp.specializations || emp.profile?.specializations || [];
+        const courseStarts = JSON.stringify(emp.courseStartedDates || emp.profile?.courseStartedDates || {});
+
         await client.query(
-          `INSERT INTO employees (id, email, name, role, status, created_at, password, profile)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `INSERT INTO employees (
+             id, email, first_name, last_name, role, status, created_at, password,
+             phone, department_id, position_code, rank_id, rank_name, bio, specializations, course_started_dates
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
            ON CONFLICT (id) DO UPDATE SET
              email = EXCLUDED.email,
-             name = EXCLUDED.name,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
              role = EXCLUDED.role,
              status = EXCLUDED.status,
              created_at = EXCLUDED.created_at,
              password = EXCLUDED.password,
-             profile = EXCLUDED.profile`,
+             phone = EXCLUDED.phone,
+             department_id = EXCLUDED.department_id,
+             position_code = EXCLUDED.position_code,
+             rank_id = EXCLUDED.rank_id,
+             rank_name = EXCLUDED.rank_name,
+             bio = EXCLUDED.bio,
+             specializations = EXCLUDED.specializations,
+             course_started_dates = EXCLUDED.course_started_dates`,
           [
             emp.id,
             emp.email,
-            emp.name,
+            firstName,
+            lastName,
             emp.role,
             emp.status || 'active',
             emp.createdAt || new Date().toISOString(),
             emp.password || 'password123',
-            JSON.stringify(emp.profile || {})
+            phone,
+            deptId,
+            posCode,
+            rankId,
+            rankName,
+            bio,
+            specs,
+            courseStarts
           ]
         );
       }
