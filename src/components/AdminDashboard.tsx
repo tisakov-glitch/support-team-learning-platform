@@ -2280,14 +2280,13 @@ export default function AdminDashboard({
       {/* LEFT SIDEBAR (Desktop) */}
       <aside className="hidden lg:flex flex-col w-64 border-r border-slate-800 bg-slate-950 text-slate-300 h-screen sticky top-0 shrink-0 shadow-2xl select-none z-30">
         {/* Brand Header */}
-        <div className="p-6 border-b border-slate-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/30">
-            <ShieldCheck className="w-5.5 h-5.5" />
+        <div className="p-5 border-b border-slate-900/80 bg-slate-950 flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <img src="/retmind-logo.png" alt="Retmind" className="h-8 w-auto object-contain brightness-0 invert" />
           </div>
-          <div>
-            <h1 className="font-extrabold tracking-tight text-sm text-white uppercase leading-none">Support Learning</h1>
-            <div className="text-[8px] text-indigo-400 uppercase tracking-widest font-extrabold mt-1">Панель управления</div>
-          </div>
+          <span className="text-[9px] font-bold text-[#C9B87A] uppercase tracking-[0.14em]">
+            Senior IT & Retail Solutions
+          </span>
         </div>
 
         {/* Sidebar Nav Items */}
@@ -2453,13 +2452,7 @@ export default function AdminDashboard({
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
-              <ShieldCheck className="w-4.5 h-4.5" />
-            </div>
-            <div>
-              <h1 className="font-extrabold tracking-tight text-xs text-slate-900 uppercase">Support Learning</h1>
-              <div className="text-[8px] text-indigo-600 uppercase tracking-widest font-extrabold">Администратор</div>
-            </div>
+            <img src="/retmind-logo.png" alt="Retmind" className="h-7 w-auto object-contain" />
           </div>
 
           <div className="flex items-center gap-2">

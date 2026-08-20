@@ -781,7 +781,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center gap-2"
+          className="px-6 py-2.5 bg-[#0F172A] hover:bg-[#1E293B] active:scale-95 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 border border-[#C9B87A]/40"
         >
           {isSubmitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
           <span>Зарегистрировать тикет</span>

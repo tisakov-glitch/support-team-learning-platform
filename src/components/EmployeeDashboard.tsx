@@ -873,25 +873,22 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
     <div id="employee-dashboard-container" className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       
       {/* Top Header */}
-      <header className="bg-slate-900 text-slate-100 py-4 px-6 border-b border-slate-800 shadow-md sticky top-0 z-40">
+      <header className="bg-[#0F172A] text-white py-3.5 px-6 border-b-2 border-[#C9B87A] shadow-md sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-500 rounded-lg text-slate-950">
-              <BookOpen className="w-5.5 h-5.5" />
-            </div>
-            <div>
-              <h1 className="font-bold tracking-tight text-base text-white">Support Learning</h1>
-              <div className="text-[10px] text-teal-400 font-semibold uppercase tracking-wider">Рабочее пространство сотрудника</div>
-            </div>
+            <img src="/retmind-logo.png" alt="Retmind" className="h-8 md:h-9 w-auto object-contain brightness-0 invert" />
+            <span className="hidden sm:inline-block text-[10px] font-bold text-[#C9B87A] uppercase tracking-[0.14em] pl-3 border-l border-white/20">
+              Support & Learning Academy
+            </span>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
               <div className="text-right">
                 <div className="text-xs font-bold text-white leading-tight">{profile.name}</div>
-                <div className="text-[10px] text-slate-400 font-mono">{profile.profile.department || 'Служба поддержки'}</div>
+                <div className="text-[10px] text-[#C9B87A] font-mono">{profile.profile.department || 'Служба поддержки'}</div>
               </div>
-              <div className="w-8 h-8 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#F5EFD7] text-[#0F172A] border border-[#C9B87A]/40 flex items-center justify-center font-mono text-xs font-bold shrink-0">
                 {initials}
               </div>
             </div>
@@ -909,28 +906,28 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
       </header>
 
       {/* Module Selector / Sub Header */}
-      <div className="bg-slate-100 border-b border-slate-250 py-3 px-6 shadow-xs">
+      <div className="bg-[#F5EFD7]/70 border-b border-[#C9B87A]/40 py-3 px-6 shadow-xs">
         <div className="max-w-6xl mx-auto flex gap-3">
           <button
             onClick={() => setActiveModule('learning')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
               activeModule === 'learning'
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                ? 'bg-[#0F172A] text-white border border-[#C9B87A]/50 shadow-md'
+                : 'bg-white border border-[#C9B87A]/40 text-[#0F172A] hover:bg-white/80'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
+            <BookOpen className="w-4 h-4 text-[#C9B87A]" />
             <span>Академия Обучения</span>
           </button>
           <button
             onClick={() => setActiveModule('tickets')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
               activeModule === 'tickets'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                ? 'bg-[#0F172A] text-white border border-[#C9B87A]/50 shadow-md'
+                : 'bg-white border border-[#C9B87A]/40 text-[#0F172A] hover:bg-white/80'
             }`}
           >
-            <TicketIcon className="w-4 h-4 text-indigo-500" />
+            <TicketIcon className="w-4 h-4 text-[#C9B87A]" />
             <span>Ticket Academy (Заявки клиентов)</span>
           </button>
         </div>
