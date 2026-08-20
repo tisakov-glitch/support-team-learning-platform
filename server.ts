@@ -813,10 +813,61 @@ if (process.env.POSTGRES_HOST || process.env.DATABASE_URL) {
   pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
 }
 
+async function ensureEmployeesTableNormalized(client: pg.PoolClient) {
+  try {
+    await client.query(`
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
+    `);
+
+    const checkNameCol = await client.query(`
+      SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'
+    `);
+    if (checkNameCol.rowCount && checkNameCol.rowCount > 0) {
+      await client.query(`
+        UPDATE employees SET 
+          first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
+          last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
+        WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
+        
+        ALTER TABLE employees DROP COLUMN IF EXISTS name;
+      `);
+    }
+
+    const checkProfileCol = await client.query(`
+      SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'
+    `);
+    if (checkProfileCol.rowCount && checkProfileCol.rowCount > 0) {
+      await client.query(`
+        UPDATE employees SET
+          phone = COALESCE(phone, profile->>'phone'),
+          department_id = COALESCE(department_id, profile->>'departmentId', (SELECT id FROM departments WHERE name = profile->>'department' LIMIT 1)),
+          position_code = COALESCE(position_code, profile->>'positionCode'),
+          rank_name = COALESCE(rank_name, profile->>'rank'),
+          bio = COALESCE(bio, profile->>'bio'),
+          course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
+        
+        ALTER TABLE employees DROP COLUMN IF EXISTS profile;
+      `);
+    }
+  } catch (err) {
+    console.warn('Warning normalizing employees table:', err);
+  }
+}
+
 async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
   if (!pgPool) return null;
   const client = await pgPool.connect();
   try {
+    await ensureEmployeesTableNormalized(client);
     const depts = (await client.query('SELECT id, name FROM departments')).rows;
     const roles = (await client.query('SELECT code, name, system_role as "systemRole" FROM roles')).rows;
     const positions = (await client.query('SELECT code, name, department_id as "departmentId", role_code as "roleCode" FROM positions')).rows;
