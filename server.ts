@@ -890,6 +890,15 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     }
 
     await client.query(`
+      UPDATE employees 
+      SET rank_id = NULL 
+      WHERE rank_id IS NOT NULL 
+        AND rank_id NOT IN (SELECT id FROM ranks);
+
+      UPDATE employees e 
+      SET rank_id = (SELECT r.id FROM ranks r WHERE r.position_code = e.position_code ORDER BY r.sort_order ASC LIMIT 1)
+      WHERE e.rank_id IS NULL AND (SELECT COUNT(*) FROM ranks WHERE position_code = e.position_code) > 0;
+
       DO $$ 
       BEGIN
           IF NOT EXISTS (
