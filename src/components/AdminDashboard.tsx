@@ -7597,6 +7597,8 @@ export default function AdminDashboard({
                   </div>
                 </div>
               </div>
+            )}
+
             {ticketAcademySubTab === 'categories' && (
               <TicketCategoryManager />
             )}
