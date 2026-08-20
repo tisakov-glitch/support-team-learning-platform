@@ -405,6 +405,16 @@ async function runMigration() {
     }
 
     // 13. Populate Support Clients & Support Client Countries Junction Table
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS support_client_countries (
+            client_id VARCHAR(64) REFERENCES support_clients(id) ON DELETE CASCADE,
+            country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE CASCADE,
+            PRIMARY KEY (client_id, country_id)
+        );
+      `);
+    } catch (err) {}
+
     if (Array.isArray(data.supportClients)) {
       console.log(`📥 Migrating ${data.supportClients.length} support clients & country links...`);
       for (const cl of data.supportClients) {
