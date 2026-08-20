@@ -2200,6 +2200,9 @@ export default function AdminDashboard({
         ? editSpecString.split(',').map(s => s.trim()).filter(s => s.length > 0)
         : [];
 
+      const matchedDept = departments.find(d => d.id === editDepartment || d.name === editDepartment);
+      const departmentId = matchedDept ? matchedDept.id : editDepartment;
+
       const response = await fetch(`/api/employees/${editingEmployee.id}`, {
         method: 'PUT',
         headers: {
@@ -2210,6 +2213,7 @@ export default function AdminDashboard({
           name: editName,
           phone: editPhone,
           department: editDepartment,
+          departmentId: departmentId,
           bio: editBio,
           specializations,
           positionCode: editPositionCode,

@@ -1698,6 +1698,18 @@ async function startServer() {
     if (phone !== undefined) targetEmployee.phone = phone;
     if (department !== undefined) targetEmployee.department = department;
     if (departmentId !== undefined) targetEmployee.departmentId = departmentId;
+
+    let resolvedDepartmentId = targetEmployee.departmentId || null;
+    const targetDeptName = targetEmployee.department;
+    if (targetDeptName) {
+      const dMatch = (db.departments || []).find(d => d.id === targetDeptName || d.name === targetDeptName || d.id === resolvedDepartmentId);
+      if (dMatch) {
+        resolvedDepartmentId = dMatch.id;
+        targetEmployee.department = dMatch.name;
+        targetEmployee.departmentId = dMatch.id;
+      }
+    }
+
     if (positionCode !== undefined) targetEmployee.positionCode = positionCode;
     if (positionName !== undefined) targetEmployee.positionName = positionName;
     if (rank !== undefined) targetEmployee.rank = rank;
@@ -1723,33 +1735,43 @@ async function startServer() {
     writeDB(db);
 
     if (pgPool) {
-      pgPool.query(
-        `UPDATE employees SET
-           first_name = $1,
-           last_name = $2,
-           email = $3,
-           role = $4,
-           phone = $5,
-           department_id = $6,
-           position_code = $7,
-           rank_name = $8,
-           bio = $9,
-           specializations = $10
-         WHERE id = $11`,
-        [
-          targetEmployee.firstName || '',
-          targetEmployee.lastName || '',
-          targetEmployee.email,
-          targetEmployee.role,
-          targetEmployee.phone || null,
-          targetEmployee.departmentId || null,
-          targetEmployee.positionCode || null,
-          targetEmployee.rank || null,
-          targetEmployee.bio || null,
-          targetEmployee.specializations || [],
-          id
-        ]
-      ).catch(err => console.error('Error directly updating employee in PostgreSQL:', err));
+      (async () => {
+        let finalDeptId = resolvedDepartmentId;
+        if (!finalDeptId && targetDeptName) {
+          try {
+            const dRes = await pgPool!.query('SELECT id FROM departments WHERE id = $1 OR name = $1 LIMIT 1', [targetDeptName]);
+            if (dRes.rows[0]) finalDeptId = dRes.rows[0].id;
+          } catch (e) {}
+        }
+
+        await pgPool!.query(
+          `UPDATE employees SET
+             first_name = $1,
+             last_name = $2,
+             email = $3,
+             role = $4,
+             phone = $5,
+             department_id = $6,
+             position_code = $7,
+             rank_name = $8,
+             bio = $9,
+             specializations = $10
+           WHERE id = $11`,
+          [
+            targetEmployee.firstName || '',
+            targetEmployee.lastName || '',
+            targetEmployee.email,
+            targetEmployee.role,
+            targetEmployee.phone || null,
+            finalDeptId || null,
+            targetEmployee.positionCode || null,
+            targetEmployee.rank || null,
+            targetEmployee.bio || null,
+            targetEmployee.specializations || [],
+            id
+          ]
+        );
+      })().catch(err => console.error('Error directly updating employee in PostgreSQL:', err));
     }
 
     const { password: _, ...updatedWithoutPassword } = targetEmployee;
