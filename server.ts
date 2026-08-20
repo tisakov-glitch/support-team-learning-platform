@@ -1810,12 +1810,21 @@ async function startServer() {
     if (positionCode !== undefined) targetEmployee.positionCode = positionCode;
     if (positionName !== undefined) targetEmployee.positionName = positionName;
 
-    let resolvedRankId = rankId || targetEmployee.rankId || null;
     const targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
+    const currentPosCode = positionCode !== undefined ? positionCode : targetEmployee.positionCode;
+
+    let resolvedRankId: string | null = rankId || null;
     if (!resolvedRankId && targetRankVal) {
-      const rMatch = (db.ranks || []).find(r => r.id === targetRankVal || r.name === targetRankVal);
+      const rMatch = (db.ranks || []).find(r => 
+        (r.id === targetRankVal || r.name === targetRankVal) && 
+        (!currentPosCode || r.positionCode === currentPosCode)
+      ) || (db.ranks || []).find(r => r.id === targetRankVal || r.name === targetRankVal);
       if (rMatch) resolvedRankId = rMatch.id;
     }
+    if (!rank && rank !== undefined) {
+      resolvedRankId = null;
+    }
+
     const resolvedRankName = (db.ranks || []).find(r => r.id === resolvedRankId)?.name || targetRankVal || '';
 
     targetEmployee.rank = resolvedRankName;
@@ -1846,15 +1855,23 @@ async function startServer() {
           } catch (e) {}
         }
 
-        let finalRankId = resolvedRankId;
-        if (!finalRankId && targetRankVal) {
+        let finalRankId: string | null = null;
+        if (targetRankVal) {
           try {
-            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, targetEmployee.positionCode || null]);
-            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+            const rRes = await pgPool!.query(
+              'SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1',
+              [targetRankVal, currentPosCode || null]
+            );
+            if (rRes.rows[0]) {
+              finalRankId = rRes.rows[0].id;
+            } else {
+              const rRes2 = await pgPool!.query(
+                'SELECT id FROM ranks WHERE (id = $1 OR name = $1) LIMIT 1',
+                [targetRankVal]
+              );
+              if (rRes2.rows[0]) finalRankId = rRes2.rows[0].id;
+            }
           } catch (e) {}
-        }
-        if (!finalRankId) {
-          finalRankId = null;
         }
 
         await pgPool!.query(
