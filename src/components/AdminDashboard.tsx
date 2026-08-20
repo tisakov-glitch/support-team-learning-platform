@@ -3205,7 +3205,9 @@ export default function AdminDashboard({
                           onChange={(e) => handlePositionChange(e.target.value)}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer font-medium text-slate-800"
                         >
-                          {dbPositions.filter(pos => pos.departmentId === newDepartmentId).map(pos => (
+                          {(dbPositions.filter(pos => pos.departmentId === newDepartmentId || !newDepartmentId).length > 0
+                             ? dbPositions.filter(pos => pos.departmentId === newDepartmentId || !newDepartmentId)
+                             : dbPositions).map(pos => (
                             <option key={pos.code} value={pos.code}>
                               [{pos.code}] {pos.name}
                             </option>
@@ -3252,9 +3254,8 @@ export default function AdminDashboard({
                                 value={newRank}
                                 onChange={(e) => setNewRank(e.target.value)}
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer font-medium text-slate-800"
-                                required
                               >
-                                <option value="">Выберите ранг</option>
+                                <option value="">Без ранга (не выбран)</option>
                                 {selectedPositionObj.ranks.map((rankOpt) => (
                                   <option key={rankOpt} value={rankOpt}>
                                     {rankOpt}
@@ -7668,7 +7669,9 @@ export default function AdminDashboard({
                         onChange={(e) => handleEditPositionChange(e.target.value)}
                         className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm bg-white cursor-pointer font-medium text-slate-800"
                       >
-                        {dbPositions.filter(pos => pos.departmentId === editDepartmentId).map(pos => (
+                        {(dbPositions.filter(pos => pos.departmentId === editDepartmentId || !editDepartmentId).length > 0
+                           ? dbPositions.filter(pos => pos.departmentId === editDepartmentId || !editDepartmentId)
+                           : dbPositions).map(pos => (
                           <option key={pos.code} value={pos.code}>
                             [{pos.code}] {pos.name}
                           </option>
@@ -7715,9 +7718,8 @@ export default function AdminDashboard({
                               value={editRank}
                               onChange={(e) => setEditRank(e.target.value)}
                               className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm bg-white cursor-pointer font-medium text-slate-800"
-                              required
                             >
-                              <option value="">Выберите ранг</option>
+                              <option value="">Без ранга (не выбран)</option>
                               {selectedPositionObj.ranks.map((rankOpt) => (
                                 <option key={rankOpt} value={rankOpt}>
                                   {rankOpt}
