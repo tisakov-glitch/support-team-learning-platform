@@ -888,6 +888,20 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
       await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;`);
       console.log('✅ Migrated rank_name -> rank_id and dropped column rank_name');
     }
+
+    await client.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (
+              SELECT 1 FROM information_schema.table_constraints 
+              WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
+          ) THEN
+              ALTER TABLE employees 
+              ADD CONSTRAINT fk_employees_rank_id 
+              FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
+          END IF;
+      EXCEPTION WHEN OTHERS THEN END $$;
+    `);
   } catch (e: any) {
     console.warn('Notice migrating rank_name to rank_id:', e.message);
   }

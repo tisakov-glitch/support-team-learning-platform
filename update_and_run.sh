@@ -55,6 +55,7 @@ run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);"
+run_psql "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id') THEN ALTER TABLE employees ADD CONSTRAINT fk_employees_rank_id FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL; END IF; EXCEPTION WHEN OTHERS THEN END \$\$;"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;"
 
 run_psql "UPDATE employees e SET rank_id = r.id FROM ranks r WHERE e.rank_id IS NULL AND r.position_code = e.position_code;"

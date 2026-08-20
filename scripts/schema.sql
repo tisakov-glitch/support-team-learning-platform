@@ -61,6 +61,20 @@ ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;
 
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
+    ) THEN
+        ALTER TABLE employees 
+        ADD CONSTRAINT fk_employees_rank_id 
+        FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
+    END IF;
+EXCEPTION WHEN OTHERS THEN 
+    -- Ignore if constraint cannot be added
+END $$;
+
 -- Populate first_name, last_name, rank_id and normalize profile JSONB
 DO $$ 
 BEGIN
