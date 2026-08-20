@@ -814,45 +814,109 @@ if (process.env.POSTGRES_HOST || process.env.DATABASE_URL) {
 }
 
 async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
-  try {
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';`);
-    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`);
+  console.log('🔄 Running PostgreSQL employees table normalization...');
 
-    const checkNameCol = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'`);
-    if (checkNameCol.rowCount && checkNameCol.rowCount > 0) {
+  // 1. Ensure columns exist
+  const addCols = [
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`
+  ];
+  for (const q of addCols) {
+    try { await client.query(q); } catch (e) {}
+  }
+
+  // 2. Safely populate first_name and last_name from name column if name exists
+  try {
+    const checkName = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'`);
+    if (checkName.rowCount && checkName.rowCount > 0) {
       await client.query(`
         UPDATE employees SET 
           first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
           last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
         WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
       `);
-      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name;`);
+      console.log('✅ Migrated name -> first_name, last_name');
     }
-
-    const checkProfileCol = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'`);
-    if (checkProfileCol.rowCount && checkProfileCol.rowCount > 0) {
-      await client.query(`
-        UPDATE employees SET
-          phone = COALESCE(phone, profile->>'phone'),
-          department_id = COALESCE(department_id, profile->>'departmentId', (SELECT id FROM departments WHERE name = profile->>'department' LIMIT 1)),
-          position_code = COALESCE(position_code, profile->>'positionCode'),
-          rank_name = COALESCE(rank_name, profile->>'rank'),
-          bio = COALESCE(bio, profile->>'bio'),
-          course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
-      `);
-      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile;`);
-    }
-    console.log('✅ PostgreSQL employees table schema migration completed (profile column dropped, normalized columns active)');
   } catch (err: any) {
-    console.warn('Warning normalizing employees table:', err.message || err);
+    console.warn('Notice during name migration:', err.message);
+  }
+
+  // 3. Safely populate fields from profile column if profile exists
+  try {
+    const checkProfile = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'`);
+    if (checkProfile.rowCount && checkProfile.rowCount > 0) {
+      try {
+        await client.query(`
+          UPDATE employees SET
+            phone = COALESCE(phone, (profile::jsonb)->>'phone'),
+            department_id = COALESCE(department_id, (profile::jsonb)->>'departmentId', (SELECT id FROM departments WHERE name = (profile::jsonb)->>'department' LIMIT 1)),
+            position_code = COALESCE(position_code, (profile::jsonb)->>'positionCode'),
+            rank_name = COALESCE(rank_name, (profile::jsonb)->>'rank'),
+            bio = COALESCE(bio, (profile::jsonb)->>'bio')
+          WHERE profile IS NOT NULL AND profile::text != '{}' AND profile::text != '';
+        `);
+      } catch (e: any) {
+        console.warn('Notice during profile jsonb field extraction:', e.message);
+      }
+      console.log('✅ Extracted fields from profile column');
+    }
+  } catch (err: any) {
+    console.warn('Notice checking profile column:', err.message);
+  }
+
+  // 4. Force Drop legacy name and profile columns
+  try {
+    await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;`);
+    console.log('✅ Dropped column name');
+  } catch (e: any) {
+    console.warn('Notice dropping name column:', e.message);
+  }
+
+  try {
+    await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;`);
+    console.log('✅ Dropped column profile');
+  } catch (e: any) {
+    console.warn('Notice dropping profile column:', e.message);
+  }
+
+  // 5. Populate from memory DB if new columns are still empty
+  try {
+    const db = readDB();
+    if (db.employees) {
+      for (const emp of Object.values(db.employees)) {
+        const parts = (emp.name || '').trim().split(/\s+/);
+        const fName = emp.firstName || parts[0] || '';
+        const lName = emp.lastName || parts.slice(1).join(' ') || '';
+        const phoneVal = emp.phone || emp.profile?.phone || null;
+        const deptVal = emp.departmentId || emp.profile?.departmentId || null;
+        const posVal = emp.positionCode || emp.profile?.positionCode || null;
+        const rankVal = emp.rank || emp.profile?.rank || null;
+        const bioVal = emp.bio || emp.profile?.bio || null;
+
+        await client.query(`
+          UPDATE employees SET
+            first_name = COALESCE(NULLIF(first_name, ''), $1),
+            last_name = COALESCE(NULLIF(last_name, ''), $2),
+            phone = COALESCE(phone, $3),
+            department_id = COALESCE(department_id, $4),
+            position_code = COALESCE(position_code, $5),
+            rank_name = COALESCE(rank_name, $6),
+            bio = COALESCE(bio, $7)
+          WHERE id = $8
+        `, [fName, lName, phoneVal, deptVal, posVal, rankVal, bioVal, emp.id]);
+      }
+      console.log('✅ Synchronized fallback data from local memory state to employees table');
+    }
+  } catch (e: any) {
+    console.warn('Notice synchronizing fallback employee state:', e.message);
   }
 }
 
