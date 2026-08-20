@@ -1092,9 +1092,7 @@ export default function AdminDashboard({
       }
     }
 
-    if (data.resolutionComment) {
-      setNewTicketResolutionComment(data.resolutionComment);
-    }
+    // Note: resolutionComment is intentionally left empty so employees write how they resolved the issue manually.
     
     if (data.channel) {
       const matchedChannel = (supportChannels || []).find(ch => 

@@ -119,9 +119,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
       const cleanDt = data.confirmedAt.slice(0, 16);
       if (cleanDt && !isNaN(Date.parse(cleanDt))) setConfirmedAt(cleanDt);
     }
-    if (data.resolutionComment) {
-      setResolutionComment(data.resolutionComment);
-    }
+    // Note: resolutionComment is intentionally left empty so employees write how they resolved the issue manually.
 
     if (data.channel) {
       const matchedChannel = (supportChannels || []).find(ch => 
