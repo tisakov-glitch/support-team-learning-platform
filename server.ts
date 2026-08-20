@@ -824,7 +824,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`

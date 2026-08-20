@@ -30,53 +30,34 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
-echo "🗄️ Applying PostgreSQL database DDL migrations (employees normalization & rank_id FK)..."
-MIGRATION_SQL="
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
-  ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
+echo "🗄️ Applying PostgreSQL database DDL migrations (rank_id FK & profile normalization)..."
 
-  DO \$\$
-  BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name') THEN
-      UPDATE employees SET 
-        first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
-        last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
-      WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
-      ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;
-    END IF;
+run_psql() {
+  if [ -n "$DATABASE_URL" ]; then
+    psql "$DATABASE_URL" -c "$1" 2>/dev/null || psql -U postgres -d support_db -c "$1" 2>/dev/null || true
+  else
+    psql -U postgres -d support_db -c "$1" 2>/dev/null || true
+  fi
+}
 
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile') THEN
-      UPDATE employees SET
-        phone = COALESCE(phone, profile->>'phone'),
-        department_id = COALESCE(department_id, profile->>'departmentId', (SELECT id FROM departments WHERE name = profile->>'department' LIMIT 1)),
-        position_code = COALESCE(position_code, profile->>'positionCode'),
-        bio = COALESCE(bio, profile->>'bio'),
-        course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
-      ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;
-    END IF;
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;"
 
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='rank_name') THEN
-      UPDATE employees e SET rank_id = r.id
-      FROM ranks r
-      WHERE e.rank_id IS NULL AND e.rank_name IS NOT NULL AND r.position_code = e.position_code AND (r.name = e.rank_name OR r.id = e.rank_name);
-
-      ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;
-    END IF;
-  END \$\$;
-"
+run_psql "UPDATE employees e SET rank_id = r.id FROM ranks r WHERE e.rank_id IS NULL AND r.position_code = e.position_code;"
+run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;"
+run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;"
+run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;"
 
 if [ -n "$DATABASE_URL" ]; then
-  psql "$DATABASE_URL" -c "$MIGRATION_SQL" 2>/dev/null || psql -U postgres -d support_db -c "$MIGRATION_SQL" 2>/dev/null || true
   psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
 else
-  psql -U postgres -d support_db -c "$MIGRATION_SQL" 2>/dev/null || true
   psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
 fi
 
