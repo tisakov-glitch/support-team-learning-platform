@@ -816,15 +816,14 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   console.log('🔄 Running PostgreSQL employees table normalization...');
 
   // 1. Ensure columns exist
+  // 1. Ensure columns exist
   const addCols = [
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`
   ];
   for (const q of addCols) {
@@ -856,9 +855,7 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
           UPDATE employees SET
             phone = COALESCE(phone, (profile::jsonb)->>'phone'),
             department_id = COALESCE(department_id, (profile::jsonb)->>'departmentId', (SELECT id FROM departments WHERE name = (profile::jsonb)->>'department' LIMIT 1)),
-            position_code = COALESCE(position_code, (profile::jsonb)->>'positionCode'),
-            rank_name = COALESCE(rank_name, (profile::jsonb)->>'rank'),
-            bio = COALESCE(bio, (profile::jsonb)->>'bio')
+            position_code = COALESCE(position_code, (profile::jsonb)->>'positionCode')
           WHERE profile IS NOT NULL AND profile::text != '{}' AND profile::text != '';
         `);
       } catch (e: any) {
@@ -870,20 +867,11 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     console.warn('Notice checking profile column:', err.message);
   }
 
-  // 4. Force Drop legacy name, profile and rank_name columns
-  try {
-    await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;`);
-    console.log('✅ Dropped column name');
-  } catch (e: any) {
-    console.warn('Notice dropping name column:', e.message);
-  }
-
-  try {
-    await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;`);
-    console.log('✅ Dropped column profile');
-  } catch (e: any) {
-    console.warn('Notice dropping profile column:', e.message);
-  }
+  // 4. Force Drop legacy columns
+  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;`); } catch (e) {}
+  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;`); } catch (e) {}
+  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;`); } catch (e) {}
+  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;`); } catch (e) {}
 
   try {
     const checkRankName = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='rank_name'`);
@@ -916,7 +904,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
         const deptVal = emp.departmentId || emp.profile?.departmentId || null;
         const posVal = emp.positionCode || emp.profile?.positionCode || null;
         const rankVal = emp.rankId || emp.rank || emp.profile?.rankId || emp.profile?.rank || null;
-        const bioVal = emp.bio || emp.profile?.bio || null;
 
         let matchedRankId = emp.rankId || null;
         if (!matchedRankId && rankVal) {
@@ -933,10 +920,9 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
             phone = COALESCE(phone, $3),
             department_id = COALESCE(department_id, $4),
             position_code = COALESCE(position_code, $5),
-            rank_id = COALESCE(rank_id, $6),
-            bio = COALESCE(bio, $7)
-          WHERE id = $8
-        `, [fName, lName, phoneVal, deptVal, posVal, matchedRankId, bioVal, emp.id]);
+            rank_id = COALESCE(rank_id, $6)
+          WHERE id = $7
+        `, [fName, lName, phoneVal, deptVal, posVal, matchedRankId, emp.id]);
       }
       console.log('✅ Synchronized fallback data from local memory state to employees table');
     }
@@ -1000,8 +986,8 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
         e.role, e.status, e.created_at as "createdAt", e.password,
         e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-        e.rank_id as "rankId", r.name as "rankName", e.bio,
-        e.specializations, e.course_started_dates as "courseStartedDates",
+        e.rank_id as "rankId", r.name as "rankName",
+        e.course_started_dates as "courseStartedDates",
         d.name as "departmentName", p.name as "positionName"
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
@@ -1134,8 +1120,6 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         positionName: emp.positionName || '',
         rank: emp.rankName || '',
         rankId: emp.rankId || '',
-        bio: emp.bio || '',
-        specializations: emp.specializations || [],
         courseStartedDates: emp.courseStartedDates || {}
       };
 
@@ -1156,8 +1140,6 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         positionName: emp.positionName || '',
         rankId: emp.rankId || '',
         rank: emp.rankName || '',
-        bio: emp.bio || '',
-        specializations: emp.specializations || [],
         courseStartedDates: emp.courseStartedDates || {},
         profile: profile
       };
@@ -1318,9 +1300,9 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
       await pgPool.query(
         `INSERT INTO employees (
            id, email, first_name, last_name, role, status, created_at, password,
-           phone, department_id, position_code, rank_id, bio, specializations, course_started_dates
+           phone, department_id, position_code, rank_id, course_started_dates
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (id) DO UPDATE SET
            email = EXCLUDED.email,
            first_name = EXCLUDED.first_name,
@@ -1332,8 +1314,6 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
            department_id = EXCLUDED.department_id,
            position_code = EXCLUDED.position_code,
            rank_id = EXCLUDED.rank_id,
-           bio = EXCLUDED.bio,
-           specializations = EXCLUDED.specializations,
            course_started_dates = EXCLUDED.course_started_dates`,
         [
           emp.id,
@@ -1348,8 +1328,6 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
           deptId,
           posCode,
           rankId,
-          bio,
-          specs,
           courseStarts
         ]
       );
@@ -1540,7 +1518,7 @@ async function startServer() {
 
   // 4. Create New Employee & Send Invitation (Admin only)
   app.post('/api/employees', authenticateUser, requireAdmin, (req, res) => {
-    const { name, firstName, lastName, email, department, departmentId, specializations, phone, bio, positionCode, positionName, role, rank, rankId } = req.body;
+    const { name, firstName, lastName, email, department, departmentId, phone, positionCode, positionName, role, rank, rankId } = req.body;
 
     if (!email || (!name && !firstName)) {
       res.status(400).json({ error: 'Имя и Email обязательны для заполнения' });
@@ -1586,8 +1564,6 @@ async function startServer() {
       phone: phone || '',
       department: resolvedDeptName,
       departmentId: resolvedDeptId,
-      specializations: specializations || [],
-      bio: bio || '',
       positionCode: resolvedPosCode,
       positionName: resolvedPosName,
       rank: resolvedRankName,
@@ -1610,8 +1586,6 @@ async function startServer() {
       positionName: resolvedPosName,
       rank: resolvedRankName,
       rankId: resolvedRankId || '',
-      bio: bio || '',
-      specializations: specializations || [],
       profile: profileObj
     };
 
@@ -1631,11 +1605,11 @@ async function startServer() {
         await pgPool!.query(
           `INSERT INTO employees (
              id, email, first_name, last_name, role, status, created_at,
-             phone, department_id, position_code, rank_id, bio, specializations
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+             phone, department_id, position_code, rank_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             id, email, fName, lName, role || 'employee', 'pending', new Date().toISOString(),
-            phone || null, resolvedDeptId, resolvedPosCode, finalRankId || null, bio || null, specializations || []
+            phone || null, resolvedDeptId, resolvedPosCode, finalRankId || null
           ]
         );
       })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
@@ -1720,7 +1694,7 @@ async function startServer() {
   app.put('/api/employees/:id', authenticateUser, (req, res) => {
     const { id } = req.params;
     const currentUser = (req as any).user as Employee;
-    const { name, firstName, lastName, email, department, departmentId, specializations, phone, bio, positionCode, positionName, role, rank, rankId } = req.body;
+    const { name, firstName, lastName, email, department, departmentId, phone, positionCode, positionName, role, rank, rankId } = req.body;
 
     // Authorization guard: Admin/Manager can edit any, Employee can edit self
     if (currentUser.role !== 'admin' && currentUser.role !== 'manager' && currentUser.id !== id) {
@@ -1789,8 +1763,6 @@ async function startServer() {
 
     targetEmployee.rank = resolvedRankName;
     targetEmployee.rankId = resolvedRankId || '';
-    if (bio !== undefined) targetEmployee.bio = bio;
-    if (specializations !== undefined) targetEmployee.specializations = specializations;
 
     // Update profile getter compatibility object
     targetEmployee.profile = {
@@ -1801,9 +1773,7 @@ async function startServer() {
       positionCode: targetEmployee.positionCode || '',
       positionName: targetEmployee.positionName || '',
       rank: targetEmployee.rank || '',
-      rankId: targetEmployee.rankId || '',
-      bio: targetEmployee.bio || '',
-      specializations: targetEmployee.specializations || []
+      rankId: targetEmployee.rankId || ''
     };
 
     db.employees[id] = targetEmployee;
@@ -1836,10 +1806,8 @@ async function startServer() {
              phone = $5,
              department_id = $6,
              position_code = $7,
-             rank_id = $8,
-             bio = $9,
-             specializations = $10
-           WHERE id = $11`,
+             rank_id = $8
+           WHERE id = $9`,
           [
             targetEmployee.firstName || '',
             targetEmployee.lastName || '',
@@ -1849,8 +1817,6 @@ async function startServer() {
             finalDeptId || null,
             targetEmployee.positionCode || null,
             finalRankId || null,
-            targetEmployee.bio || null,
-            targetEmployee.specializations || [],
             id
           ]
         );

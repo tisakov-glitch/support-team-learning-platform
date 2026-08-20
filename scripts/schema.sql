@@ -46,8 +46,6 @@ CREATE TABLE IF NOT EXISTS employees (
     department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
     position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL,
     rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL,
-    bio TEXT,
-    specializations TEXT[] DEFAULT '{}',
     course_started_dates JSONB DEFAULT '{}'::jsonb
 );
 
@@ -57,10 +55,11 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT ''
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;
+ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;
+ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;
 
 -- Populate first_name, last_name, rank_id and normalize profile JSONB
 DO $$ 
@@ -71,7 +70,7 @@ BEGIN
             last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
         WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
 
-        ALTER TABLE employees DROP COLUMN IF EXISTS name;
+        ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile') THEN
@@ -79,10 +78,9 @@ BEGIN
             phone = COALESCE(phone, profile->>'phone'),
             department_id = COALESCE(department_id, profile->>'departmentId', (SELECT id FROM departments WHERE name = profile->>'department' LIMIT 1)),
             position_code = COALESCE(position_code, profile->>'positionCode'),
-            bio = COALESCE(bio, profile->>'bio'),
             course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
         
-        ALTER TABLE employees DROP COLUMN IF EXISTS profile;
+        ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='rank_name') THEN

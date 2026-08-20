@@ -28,9 +28,6 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   
   // Editable form fields
   const [phone, setPhone] = useState(employee.profile.phone || '');
-  const [bio, setBio] = useState(employee.profile.bio || '');
-  const [specInput, setSpecInput] = useState('');
-  const [specs, setSpecs] = useState<string[]>(employee.profile.specializations || []);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -826,9 +823,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          phone,
-          bio,
-          specializations: specs
+          phone
         })
       });
 
@@ -988,28 +983,6 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                   </span>
                 </div>
 
-                <div>
-                  <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">О себе / Навыки</span>
-                  <p className="text-slate-600 text-xs italic mt-1 leading-relaxed">
-                    {profile.profile.bio || 'Здесь будет ваше краткое описание, которое увидят наставники...'}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Мои специализации</span>
-                  {specs.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {specs.map((s, idx) => (
-                        <span key={idx} className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium font-mono rounded">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 italic text-xs">Специализации не настроены</span>
-                  )}
-                </div>
-
                 <button
                   id="edit-profile-btn"
                   onClick={() => setEditMode(true)}
@@ -1043,54 +1016,10 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">О себе (Биография)</label>
-                  <textarea
-                    id="edit-bio"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    rows={3}
-                    placeholder="Расскажите о своем опыте..."
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Специализации (Теги)</label>
-                  <div className="flex gap-1.5 mb-2">
-                    <input
-                      type="text"
-                      value={specInput}
-                      onChange={(e) => setSpecInput(e.target.value)}
-                      placeholder="Напр. CRM"
-                      className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddSpec}
-                      className="p-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {specs.map((s, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-mono border border-slate-200">
-                        {s}
-                        <button type="button" onClick={() => handleRemoveSpec(idx)} className="text-slate-400 hover:text-slate-600">
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="flex gap-2 pt-2 border-t">
                   <button
                     type="button"
                     onClick={() => {
-                      setSpecs(profile.profile.specializations || []);
-                      setBio(profile.profile.bio || '');
                       setPhone(profile.profile.phone || '');
                       setEditMode(false);
                     }}

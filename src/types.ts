@@ -46,12 +46,12 @@ export const COMPANY_POSITIONS = [
 export interface EmployeeProfile {
   phone?: string;
   department?: string;
-  specializations?: string[];
-  bio?: string;
+  departmentId?: string;
   avatarStyle?: string; // Seed or style for UI avatar rendering
   positionCode?: string;
   positionName?: string;
   rank?: string;
+  rankId?: string;
 }
 
 export interface Employee {
@@ -70,8 +70,6 @@ export interface Employee {
   positionName?: string;
   rankId?: string;
   rank?: string;
-  bio?: string;
-  specializations?: string[];
   courseStartedDates?: Record<string, string>;
   profile: EmployeeProfile;
 }

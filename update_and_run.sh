@@ -54,13 +54,13 @@ run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) 
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';"
+run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;"
 
 run_psql "UPDATE employees e SET rank_id = r.id FROM ranks r WHERE e.rank_id IS NULL AND r.position_code = e.position_code;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;"
+run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;"
+run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;"
 

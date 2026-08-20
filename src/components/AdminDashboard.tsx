@@ -67,8 +67,6 @@ export default function AdminDashboard({
   const [newDepartmentId, setNewDepartmentId] = useState('d1');
   const [newDepartment, setNewDepartment] = useState('RetMind Support');
   const [newRole, setNewRole] = useState<UserRole>('employee');
-  const [newBio, setNewBio] = useState('');
-  const [newSpecString, setNewSpecString] = useState(''); // comma-separated specializations
   const [newRank, setNewRank] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -80,8 +78,6 @@ export default function AdminDashboard({
   const [editDepartmentId, setEditDepartmentId] = useState('d1');
   const [editDepartment, setEditDepartment] = useState('RetMind Support');
   const [editRole, setEditRole] = useState<UserRole>('employee');
-  const [editBio, setEditBio] = useState('');
-  const [editSpecString, setEditSpecString] = useState('');
   const [editRank, setEditRank] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -2125,11 +2121,6 @@ export default function AdminDashboard({
     setSuccessMsg('');
 
     try {
-      const token = localStorage.getItem('support_learning_token');
-      const specializations = newSpecString
-        ? newSpecString.split(',').map(s => s.trim()).filter(s => s.length > 0)
-        : [];
-
       const response = await fetch('/api/employees', {
         method: 'POST',
         headers: {
@@ -2141,8 +2132,6 @@ export default function AdminDashboard({
           email: newEmail,
           phone: newPhone,
           departmentId: newDepartmentId,
-          bio: newBio,
-          specializations,
           positionCode: newPositionCode,
           role: newRole,
           rank: newRank
@@ -2165,8 +2154,6 @@ export default function AdminDashboard({
       setNewPositionCode('13');
       setNewDepartment('RetMind Support');
       setNewRole('employee');
-      setNewBio('');
-      setNewSpecString('');
       setNewRank('');
       setShowAddForm(false);
       
@@ -2192,8 +2179,6 @@ export default function AdminDashboard({
     const deptObj = dbDepartments.find(d => d.id === emp.departmentId || d.id === emp.profile?.departmentId || d.name === emp.department || d.name === emp.profile?.department);
     setEditDepartmentId(deptObj ? deptObj.id : (emp.departmentId || 'd1'));
     setEditDepartment(deptObj ? deptObj.name : (emp.department || 'RetMind Support'));
-    setEditBio(emp.profile.bio || emp.bio || '');
-    setEditSpecString(emp.profile.specializations ? emp.profile.specializations.join(', ') : (emp.specializations ? emp.specializations.join(', ') : ''));
     setEditPositionCode(emp.positionCode || emp.profile.positionCode || '13');
     setEditRole(emp.role || 'employee');
     setEditRank(emp.rank || emp.profile.rank || '');
@@ -2209,10 +2194,6 @@ export default function AdminDashboard({
 
     try {
       const token = localStorage.getItem('support_learning_token');
-      const specializations = editSpecString
-        ? editSpecString.split(',').map(s => s.trim()).filter(s => s.length > 0)
-        : [];
-
       const response = await fetch(`/api/employees/${editingEmployee.id}`, {
         method: 'PUT',
         headers: {
@@ -2223,8 +2204,6 @@ export default function AdminDashboard({
           name: editName,
           phone: editPhone,
           departmentId: editDepartmentId,
-          bio: editBio,
-          specializations,
           positionCode: editPositionCode,
           role: editRole,
           rank: editRank
@@ -3627,27 +3606,8 @@ export default function AdminDashboard({
                             <div className="flex items-start gap-2.5 pt-1 border-t border-slate-150">
                               <BookOpen className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                               <div>
-                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider leading-none mb-1">О себе / Биография</p>
-                                <p className="text-slate-600 leading-relaxed italic text-[11px]">
-                                  {selectedEmp.profile.bio || 'Информации о сотруднике пока нет.'}
-                                </p>
                               </div>
                             </div>
-
-                            {/* Tags */}
-                            {selectedEmp.profile.specializations && selectedEmp.profile.specializations.length > 0 && (
-                              <div className="pt-2 border-t border-slate-150">
-                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider leading-none mb-2">Специализации</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {selectedEmp.profile.specializations.map((spec, sidx) => (
-                                    <span key={sidx} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-white border border-slate-200 text-slate-650 rounded-lg text-[9px] font-bold font-mono uppercase tracking-tight shadow-2xs">
-                                      <Tag className="w-2.5 h-2.5 text-slate-400" />
-                                      {spec}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
 
