@@ -36,10 +36,20 @@ export const TicketCategoryManager: React.FC = () => {
       if (!res.ok) throw new Error('Не удалось загрузить категории');
       const data = await res.json();
       setCategories(data);
-      // Auto expand first system
-      if (data.length > 0 && data[0].id) {
-        setExpandedSystems(prev => ({ ...prev, [data[0].id]: true }));
-      }
+      
+      // Auto expand all systems and modules by default
+      const initialSys: Record<string, boolean> = {};
+      const initialMods: Record<string, boolean> = {};
+      data.forEach((sys: any) => {
+        const sysKey = sys.id || sys.name;
+        initialSys[sysKey] = true;
+        (sys.modules || []).forEach((mod: any) => {
+          const modKey = mod.id || mod.name;
+          initialMods[modKey] = true;
+        });
+      });
+      setExpandedSystems(initialSys);
+      setExpandedModules(initialMods);
     } catch (err: any) {
       setError(err.message || 'Ошибка связи с сервером');
     } finally {
@@ -204,6 +214,36 @@ export const TicketCategoryManager: React.FC = () => {
     }
   };
 
+  const handleExpandAll = () => {
+    const sysMap: Record<string, boolean> = {};
+    const modMap: Record<string, boolean> = {};
+    categories.forEach((sys: any) => {
+      const sysKey = sys.id || sys.name;
+      sysMap[sysKey] = true;
+      (sys.modules || []).forEach((mod: any) => {
+        const modKey = mod.id || mod.name;
+        modMap[modKey] = true;
+      });
+    });
+    setExpandedSystems(sysMap);
+    setExpandedModules(modMap);
+  };
+
+  const handleCollapseAll = () => {
+    const sysMap: Record<string, boolean> = {};
+    const modMap: Record<string, boolean> = {};
+    categories.forEach((sys: any) => {
+      const sysKey = sys.id || sys.name;
+      sysMap[sysKey] = false;
+      (sys.modules || []).forEach((mod: any) => {
+        const modKey = mod.id || mod.name;
+        modMap[modKey] = false;
+      });
+    });
+    setExpandedSystems(sysMap);
+    setExpandedModules(modMap);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -223,23 +263,42 @@ export const TicketCategoryManager: React.FC = () => {
           </p>
         </div>
 
-        {/* Add System Form */}
-        <form onSubmit={handleAddSystem} className="flex items-center gap-2 bg-[#F7F5F2] p-2 rounded-xl border border-[#C9B87A]/30">
-          <input
-            type="text"
-            placeholder="Новая Система (напр. ERP)"
-            value={newSystemName}
-            onChange={(e) => setNewSystemName(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C9B87A]"
-          />
-          <button
-            type="submit"
-            className="px-4 py-1.5 bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-[#C9B87A]" />
-            <span>Добавить</span>
-          </button>
-        </form>
+        {/* Actions & Add System Form */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExpandAll}
+              className="px-3 py-1.5 bg-[#F5EFD7] hover:bg-[#E1DEDB] border border-[#C9B87A]/45 text-[#0F172A] font-bold rounded-lg text-xs transition-all cursor-pointer shadow-2xs"
+            >
+              📖 Развернуть всё
+            </button>
+            <button
+              type="button"
+              onClick={handleCollapseAll}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-lg text-xs transition-all cursor-pointer shadow-2xs"
+            >
+              📁 Свернуть всё
+            </button>
+          </div>
+
+          <form onSubmit={handleAddSystem} className="flex items-center gap-2 bg-[#F7F5F2] p-2 rounded-xl border border-[#C9B87A]/30">
+            <input
+              type="text"
+              placeholder="Новая Система (напр. ERP)"
+              value={newSystemName}
+              onChange={(e) => setNewSystemName(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C9B87A]"
+            />
+            <button
+              type="submit"
+              className="px-4 py-1.5 bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[#C9B87A]" />
+              <span>Добавить</span>
+            </button>
+          </form>
+        </div>
       </div>
 
       {error && (
