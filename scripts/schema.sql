@@ -272,10 +272,14 @@ CREATE TABLE IF NOT EXISTS ticket_category_actions (
     CONSTRAINT unique_type_action_name UNIQUE (type_id, name)
 );
 
--- Grant privileges if allowed
+-- Grant privileges table-by-table to avoid permission error on individually owned tables
 DO $$ 
+DECLARE 
+    r RECORD;
 BEGIN
-   EXECUTE 'GRANT ALL ON ALL TABLES IN SCHEMA public TO PUBLIC';
-EXCEPTION WHEN OTHERS THEN 
-   -- Ignore if permissions cannot be granted
+    FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+        BEGIN
+            EXECUTE 'GRANT ALL PRIVILEGES ON TABLE ' || quote_ident(r.tablename) || ' TO PUBLIC';
+        EXCEPTION WHEN OTHERS THEN END;
+    END LOOP;
 END $$;
