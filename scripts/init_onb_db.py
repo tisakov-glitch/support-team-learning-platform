@@ -364,18 +364,34 @@ def populate_data(cursor, data):
             (ch["id"], ch["code"], ch["name"])
         )
 
-    # 11. Support Clients
+    # 11. Support Clients & Support Client Countries Junction Table
     clients = data.get("supportClients", [])
-    print(f"  -> Migrating {len(clients)} support clients...")
+    scountries = data.get("supportCountries", [])
+    print(f"  -> Migrating {len(clients)} support clients & country links...")
     for cl in clients:
         cursor.execute(
             """
-            INSERT INTO support_clients (id, name, countries)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, countries = EXCLUDED.countries;
+            INSERT INTO support_clients (id, name)
+            VALUES (%s, %s)
+            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
             """,
-            (cl["id"], cl["name"], json.dumps(cl.get("countries", [])))
+            (cl["id"], cl["name"])
         )
+        try:
+            cursor.execute("DELETE FROM support_client_countries WHERE client_id = %s;", (cl["id"],))
+            for c_item in cl.get("countries", []):
+                matched = next((sc for sc in scountries if sc.get("name") == c_item or sc.get("code") == c_item or sc.get("id") == c_item), None)
+                if matched:
+                    cursor.execute(
+                        """
+                        INSERT INTO support_client_countries (client_id, country_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING;
+                        """,
+                        (cl["id"], matched["id"])
+                    )
+        except Exception:
+            pass
 
     # 12. Support Stores
     stores = data.get("supportStores", [])

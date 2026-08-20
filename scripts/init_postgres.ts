@@ -404,16 +404,31 @@ async function runMigration() {
       }
     }
 
-    // 13. Populate Support Clients
+    // 13. Populate Support Clients & Support Client Countries Junction Table
     if (Array.isArray(data.supportClients)) {
-      console.log(`📥 Migrating ${data.supportClients.length} support clients...`);
+      console.log(`📥 Migrating ${data.supportClients.length} support clients & country links...`);
       for (const cl of data.supportClients) {
         await client.query(
-          `INSERT INTO support_clients (id, name, countries)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, countries = EXCLUDED.countries`,
-          [cl.id, cl.name, JSON.stringify(cl.countries || [])]
+          `INSERT INTO support_clients (id, name)
+           VALUES ($1, $2)
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
+          [cl.id, cl.name]
         );
+
+        try {
+          await client.query(`DELETE FROM support_client_countries WHERE client_id = $1`, [cl.id]);
+          for (const countryItem of cl.countries || []) {
+            const matchedCountry = (data.supportCountries || []).find((c: any) => c.name === countryItem || c.code === countryItem || c.id === countryItem);
+            if (matchedCountry) {
+              await client.query(
+                `INSERT INTO support_client_countries (client_id, country_id)
+                 VALUES ($1, $2)
+                 ON CONFLICT DO NOTHING`,
+                [cl.id, matchedCountry.id]
+              );
+            }
+          }
+        } catch (err) {}
       }
     }
 

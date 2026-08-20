@@ -136,8 +136,7 @@ CREATE TABLE IF NOT EXISTS support_channels (
 -- 11. Support Clients Table
 CREATE TABLE IF NOT EXISTS support_clients (
     id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    countries JSONB DEFAULT '[]'::jsonb
+    name VARCHAR(255) NOT NULL
 );
 
 -- 12. Support Countries Table
@@ -147,6 +146,13 @@ CREATE TABLE IF NOT EXISTS support_countries (
     name VARCHAR(255) NOT NULL,
     status VARCHAR(64) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 13. Support Client Countries Junction Table (Many-to-Many)
+CREATE TABLE IF NOT EXISTS support_client_countries (
+    client_id VARCHAR(64) REFERENCES support_clients(id) ON DELETE CASCADE,
+    country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE CASCADE,
+    PRIMARY KEY (client_id, country_id)
 );
 
 -- 13. Support Stores Table

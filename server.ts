@@ -688,16 +688,6 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
     const grades = (await client.query('SELECT id, employee_id as "employeeId", course_id as "courseId", lesson_id as "lessonId", score, comment, graded_by as "gradedBy", graded_by_name as "gradedByName", graded_at as "gradedAt" FROM lesson_grades')).rows;
     const tickets = (await client.query('SELECT id, channel, client, country, creator_type as "creatorType", requester_name as "requesterName", subject, description, status, created_at as "createdAt", resolved_at as "resolvedAt", closed_at as "closedAt", assigned_to_id as "assignedToId", assigned_to_name as "assignedToName", resolution_comment as "resolutionComment", closed_by_id as "closedById", closed_by_name as "closedByName", system, module, type, action, kind, attachments, store_id as "storeId", store_name as "storeName", started_working_at as "startedWorkingAt", confirmed_at as "confirmedAt", confirmation_attachment as "confirmationAttachment" FROM tickets')).rows;
     const supportChannels = (await client.query('SELECT id, code, name FROM support_channels')).rows;
-    const supportClients = (await client.query('SELECT id, name, countries FROM support_clients')).rows;
-
-    try {
-      await client.query(`
-        ALTER TABLE support_stores ADD COLUMN IF NOT EXISTS country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE SET NULL;
-      `);
-    } catch (e) {}
-
-    const supportStores = (await client.query('SELECT id, name, client_id as "clientId", country_id as "countryId", country, code, status FROM support_stores')).rows;
-    const supportKinds = (await client.query('SELECT id, name FROM support_kinds')).rows;
 
     let supportCountries: SupportCountry[] = [];
     try {
@@ -730,6 +720,81 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         }
       }
     }
+
+    // Ensure support_client_countries junction table exists
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS support_client_countries (
+            client_id VARCHAR(64) REFERENCES support_clients(id) ON DELETE CASCADE,
+            country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE CASCADE,
+            PRIMARY KEY (client_id, country_id)
+        );
+      `);
+    } catch (e) {}
+
+    let supportClients: SupportClient[] = [];
+    try {
+      const clientRows = (await client.query('SELECT id, name FROM support_clients')).rows;
+      let linksRows: any[] = [];
+      try {
+        linksRows = (await client.query(`
+          SELECT scc.client_id as "clientId", sc.id as "countryId", sc.name as "countryName"
+          FROM support_client_countries scc
+          JOIN support_countries sc ON scc.country_id = sc.id
+        `)).rows;
+      } catch (e) {}
+
+      const clientCountriesMap: Record<string, string[]> = {};
+      for (const link of linksRows) {
+        if (!clientCountriesMap[link.clientId]) clientCountriesMap[link.clientId] = [];
+        clientCountriesMap[link.clientId].push(link.countryName);
+      }
+
+      let legacyClients: any[] = [];
+      if (linksRows.length === 0) {
+        try {
+          legacyClients = (await client.query('SELECT id, name, countries FROM support_clients')).rows;
+        } catch (e) {}
+      }
+
+      for (const cl of clientRows) {
+        let countriesList = clientCountriesMap[cl.id];
+        if (!countriesList || countriesList.length === 0) {
+          const legacyObj = legacyClients.find(l => l.id === cl.id);
+          if (legacyObj && Array.isArray(legacyObj.countries)) {
+            countriesList = legacyObj.countries;
+            // Auto-migrate legacy countries to support_client_countries table
+            for (const cName of countriesList) {
+              const matchedCountry = supportCountries.find(sc => sc.name === cName || sc.code === cName || sc.id === cName);
+              if (matchedCountry) {
+                try {
+                  await client.query(
+                    `INSERT INTO support_client_countries (client_id, country_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                    [cl.id, matchedCountry.id]
+                  );
+                } catch (err) {}
+              }
+            }
+          }
+        }
+        supportClients.push({
+          id: cl.id,
+          name: cl.name,
+          countries: countriesList || []
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load support_clients:', err);
+    }
+
+    try {
+      await client.query(`
+        ALTER TABLE support_stores ADD COLUMN IF NOT EXISTS country_id VARCHAR(64) REFERENCES support_countries(id) ON DELETE SET NULL;
+      `);
+    } catch (e) {}
+
+    const supportStores = (await client.query('SELECT id, name, client_id as "clientId", country_id as "countryId", country, code, status FROM support_stores')).rows;
+    const supportKinds = (await client.query('SELECT id, name FROM support_kinds')).rows;
 
     const employees: Record<string, Employee & { password?: string }> = {};
     for (const emp of employeesRows) {
@@ -804,11 +869,26 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
     for (const cl of data.supportClients || []) {
       try {
         await pgPool.query(
-          `INSERT INTO support_clients (id, name, countries)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, countries = EXCLUDED.countries`,
-          [cl.id, cl.name, JSON.stringify(cl.countries || [])]
+          `INSERT INTO support_clients (id, name)
+           VALUES ($1, $2)
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
+          [cl.id, cl.name]
         );
+
+        try {
+          await pgPool.query(`DELETE FROM support_client_countries WHERE client_id = $1`, [cl.id]);
+          for (const countryItem of cl.countries || []) {
+            const matchedCountry = (data.supportCountries || []).find(c => c.name === countryItem || c.code === countryItem || c.id === countryItem);
+            if (matchedCountry) {
+              await pgPool.query(
+                `INSERT INTO support_client_countries (client_id, country_id)
+                 VALUES ($1, $2)
+                 ON CONFLICT DO NOTHING`,
+                [cl.id, matchedCountry.id]
+              );
+            }
+          }
+        } catch (err) {}
       } catch (err) {}
     }
 
