@@ -38,12 +38,21 @@ export POSTGRES_DB="${POSTGRES_DB:-onb}"
 
 echo "🗄️ Applying PostgreSQL database DDL migrations from scripts/schema.sql..."
 
+grant_cmd="GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO PUBLIC; GRANT ALL PRIVILEGES ON SCHEMA public TO PUBLIC;"
+
 if [ -n "$DATABASE_URL" ]; then
   psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
+  psql "$DATABASE_URL" -c "$grant_cmd" 2>/dev/null || psql -U postgres -d support_db -c "$grant_cmd" 2>/dev/null || psql -U postgres -d onb -c "$grant_cmd" 2>/dev/null || true
 else
   PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null \
   || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null \
   || psql -U postgres -d postgres -f scripts/schema.sql 2>/dev/null \
+  || true
+
+  PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$grant_cmd" 2>/dev/null \
+  || psql -U postgres -d support_db -c "$grant_cmd" 2>/dev/null \
+  || psql -U postgres -d onb -c "$grant_cmd" 2>/dev/null \
+  || psql -U postgres -d postgres -c "$grant_cmd" 2>/dev/null \
   || true
 fi
 
