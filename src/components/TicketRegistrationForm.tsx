@@ -609,6 +609,132 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
         </div>
       )}
 
+      {/* Optional lifecycle fields */}
+      <div className="bg-indigo-50/20 border border-indigo-100/40 rounded-2xl p-4 text-xs space-y-3.5">
+        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block">
+          Дополнительные реквизиты жизненного цикла (Опционально)
+        </span>
+
+        {employees && employees.length > 0 && (
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Назначить исполнителя</label>
+            <select
+              value={assignedToId}
+              onChange={(e) => {
+                const selectedId = e.target.value;
+                setAssignedToId(selectedId);
+                const emp = employees.find(emp => emp.id === selectedId);
+                setAssignedToName(emp ? emp.name : '');
+              }}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            >
+              <option value="">— Не назначен —</option>
+              {employees.filter(emp => emp.status === 'active').map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} ({emp.profile?.positionName || (emp.role === 'admin' ? 'Администратор' : 'Специалист')})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">1. Время и дата заявки</label>
+            <input
+              type="datetime-local"
+              value={createdAt}
+              onChange={(e) => setCreatedAt(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">2. Время начала работы</label>
+            <input
+              type="datetime-local"
+              value={startedWorkingAt}
+              onChange={(e) => setStartedWorkingAt(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">3. Время и дата закрытия</label>
+            <input
+              type="datetime-local"
+              value={closedAt}
+              onChange={(e) => setClosedAt(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">4. Подтверждение клиента</label>
+            <input
+              type="datetime-local"
+              value={confirmedAt}
+              onChange={(e) => setConfirmedAt(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Комментарий решения</label>
+          <textarea
+            rows={2}
+            placeholder="Комментарий решения при закрытии тикета..."
+            value={resolutionComment}
+            onChange={(e) => setResolutionComment(e.target.value)}
+            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 resize-none"
+          />
+        </div>
+
+        <div className="border-t border-slate-200/50 pt-2.5 space-y-1.5">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Прикрепить скриншот подтверждения от клиента</label>
+          <div className="flex items-center gap-2">
+            <input
+              id="ticket-form-confirmation-file-input"
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  const file = e.target.files[0];
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    if (ev.target?.result) {
+                      setConfirmationAttachment({
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        url: ev.target.result as string
+                      });
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="text-xs text-slate-500"
+            />
+          </div>
+          {confirmationAttachment && (
+            <div className="mt-2 flex items-center gap-2 p-2 bg-white border rounded-xl">
+              <div className="w-10 h-10 rounded-lg overflow-hidden border bg-slate-50">
+                <img src={confirmationAttachment.url} alt="Превью" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              </div>
+              <div className="overflow-hidden flex-1">
+                <p className="text-[10px] text-slate-600 truncate font-bold">{confirmationAttachment.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmationAttachment(null)}
+                className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Attachments */}
       <div>
         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Прикрепленные файлы</label>
