@@ -1453,28 +1453,57 @@ async function startServer() {
   });
 
   // 2. Auth Me (Fetch Current Active Session)
-  app.get('/api/auth/me', authenticateUser, (req, res) => {
-    const user = (req as any).user;
+  app.get('/api/auth/me', authenticateUser, async (req, res) => {
+    const user = (req as any).user as Employee;
+    if (pgPool) {
+      try {
+        const freshDb = await loadDBFromPostgresAsync();
+        if (freshDb && freshDb.employees && freshDb.employees[user.id]) {
+          const { password: _, ...userData } = freshDb.employees[user.id];
+          res.json(userData);
+          return;
+        }
+      } catch (e) {}
+    }
     const { password: _, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);
   });
 
   // 2b. Get Active Employees for Ticket Assignment (All authenticated users)
-  app.get('/api/employees/active', authenticateUser, (req, res) => {
-    const db = readDB();
-    if (!db.employees) {
-      return res.json([]);
+  app.get('/api/employees/active', authenticateUser, async (req, res) => {
+    let empList: Employee[] = [];
+    if (pgPool) {
+      try {
+        const freshDb = await loadDBFromPostgresAsync();
+        if (freshDb && freshDb.employees) {
+          empList = Object.values(freshDb.employees);
+        }
+      } catch (e) {}
     }
-    const activeList = Object.values(db.employees)
+    if (empList.length === 0) {
+      const db = readDB();
+      empList = Object.values(db.employees || {});
+    }
+    const activeList = empList
       .filter((emp: any) => emp.status === 'active')
       .map(({ password: _, ...user }: any) => user);
     res.json(activeList);
   });
 
   // 3. Get All Employees (Admin only)
-  app.get('/api/employees', authenticateUser, requireAdmin, (req, res) => {
+  app.get('/api/employees', authenticateUser, requireAdmin, async (req, res) => {
+    if (pgPool) {
+      try {
+        const freshDb = await loadDBFromPostgresAsync();
+        if (freshDb && freshDb.employees) {
+          const employeesList = Object.values(freshDb.employees).map(({ password: _, ...user }) => user);
+          res.json(employeesList);
+          return;
+        }
+      } catch (e) {}
+    }
     const db = readDB();
-    const employeesList = Object.values(db.employees).map(({ password: _, ...user }) => user);
+    const employeesList = Object.values(db.employees || {}).map(({ password: _, ...user }) => user);
     res.json(employeesList);
   });
 
