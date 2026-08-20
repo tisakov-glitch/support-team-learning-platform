@@ -74,6 +74,10 @@ else
   || true
 fi
 
+run_psql "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;"
+run_psql "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO PUBLIC;"
+run_psql "GRANT ALL PRIVILEGES ON SCHEMA public TO PUBLIC;"
+
 MODE="${1:-prod}"
 
 if [ "$MODE" = "dev" ]; then

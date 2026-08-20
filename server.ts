@@ -943,19 +943,36 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       }
     }
 
-    const employeesRows = (await client.query(`
-      SELECT 
-        e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
-        e.role, e.status, e.created_at as "createdAt", e.password,
-        e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-        e.rank_id as "rankId", r.name as "rankName",
-        e.course_started_dates as "courseStartedDates",
-        d.name as "departmentName", p.name as "positionName"
-      FROM employees e
-      LEFT JOIN departments d ON e.department_id = d.id
-      LEFT JOIN positions p ON e.position_code = p.code
-      LEFT JOIN ranks r ON e.rank_id = r.id
-    `)).rows;
+    let employeesRows: any[] = [];
+    try {
+      employeesRows = (await client.query(`
+        SELECT 
+          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+          e.role, e.status, e.created_at as "createdAt", e.password,
+          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+          e.rank_id as "rankId", r.name as "rankName",
+          e.course_started_dates as "courseStartedDates",
+          d.name as "departmentName", p.name as "positionName"
+        FROM employees e
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_code = p.code
+        LEFT JOIN ranks r ON e.rank_id = r.id
+      `)).rows;
+    } catch (e: any) {
+      console.warn('Notice querying employees with ranks join:', e.message);
+      employeesRows = (await client.query(`
+        SELECT 
+          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+          e.role, e.status, e.created_at as "createdAt", e.password,
+          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+          e.rank_id as "rankId", NULL as "rankName",
+          e.course_started_dates as "courseStartedDates",
+          d.name as "departmentName", p.name as "positionName"
+        FROM employees e
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_code = p.code
+      `)).rows;
+    }
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
     const courses = (await client.query('SELECT id, title, description, position_code as "positionCode", position_name as "positionName", rank, bindings, lessons, created_at as "createdAt", study_duration_days as "studyDurationDays", exam_duration_days as "examDurationDays" FROM courses')).rows;
