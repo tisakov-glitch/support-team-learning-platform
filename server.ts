@@ -895,10 +895,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
       WHERE rank_id IS NOT NULL 
         AND rank_id NOT IN (SELECT id FROM ranks);
 
-      UPDATE employees e 
-      SET rank_id = (SELECT r.id FROM ranks r WHERE r.position_code = e.position_code ORDER BY r.sort_order ASC LIMIT 1)
-      WHERE e.rank_id IS NULL AND (SELECT COUNT(*) FROM ranks WHERE position_code = e.position_code) > 0;
-
       DO $$ 
       BEGIN
           IF NOT EXISTS (
@@ -1824,14 +1820,6 @@ async function startServer() {
           if (!finalRankId && targetRankVal) {
             const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, targetEmployee.positionCode || null]);
             if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
-          }
-          if (!finalRankId && targetEmployee.positionCode) {
-            const rRes2 = await pgPool!.query('SELECT id FROM ranks WHERE position_code = $1 LIMIT 1', [targetEmployee.positionCode]);
-            if (rRes2.rows[0]) finalRankId = rRes2.rows[0].id;
-          }
-          if (!finalRankId) {
-            const rRes3 = await pgPool!.query('SELECT id FROM ranks LIMIT 1');
-            if (rRes3.rows[0]) finalRankId = rRes3.rows[0].id;
           }
         } catch (e) {}
 

@@ -68,11 +68,6 @@ SET rank_id = NULL
 WHERE rank_id IS NOT NULL 
   AND rank_id NOT IN (SELECT id FROM ranks);
 
--- Assign valid rank_id matching position_code if rank_id is still NULL
-UPDATE employees e 
-SET rank_id = (SELECT r.id FROM ranks r WHERE r.position_code = e.position_code ORDER BY r.sort_order ASC LIMIT 1)
-WHERE e.rank_id IS NULL AND (SELECT COUNT(*) FROM ranks WHERE position_code = e.position_code) > 0;
-
 -- Now safely add the Foreign Key constraint
 DO $$ 
 BEGIN
