@@ -10,7 +10,7 @@ import {
   HelpCircle, ChevronRight, Edit3, Check, Save, Tag, Plus, X, Globe, Star,
   FileText, Video, ExternalLink, Ticket as TicketIcon, Search, AlertTriangle, Trash2, Paperclip
 } from 'lucide-react';
-import { Employee, Course, Lesson, LessonGrade, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportClient, SupportStore, SupportKind } from '../types';
+import { Employee, Course, Lesson, LessonGrade, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportClient, SupportStore, SupportKind, SupportChannel, SupportCountry } from '../types';
 import { TICKET_CATEGORIES } from '../ticketCategories';
 import { VoiceTicketRecorder } from './VoiceTicketRecorder';
 import { ImageTicketAnalyzer } from './ImageTicketAnalyzer';
@@ -149,7 +149,43 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   const [supportClients, setSupportClients] = useState<SupportClient[]>([]);
   const [supportStores, setSupportStores] = useState<SupportStore[]>([]);
   const [supportKinds, setSupportKinds] = useState<SupportKind[]>([]);
+  const [supportChannels, setSupportChannels] = useState<SupportChannel[]>([]);
+  const [supportCountries, setSupportCountries] = useState<SupportCountry[]>([]);
   const [activeEmployees, setActiveEmployees] = useState<Employee[]>([]);
+
+  const fetchSupportChannels = async () => {
+    try {
+      const token = localStorage.getItem('support_learning_token');
+      const response = await fetch('/api/support-channels', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSupportChannels(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch support channels', err);
+    }
+  };
+
+  const fetchSupportCountries = async () => {
+    try {
+      const token = localStorage.getItem('support_learning_token');
+      const response = await fetch('/api/support-countries', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSupportCountries(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch support countries', err);
+    }
+  };
 
   const fetchActiveEmployees = async () => {
     try {
@@ -747,6 +783,8 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
     fetchSupportClients();
     fetchSupportStores();
     fetchSupportKinds();
+    fetchSupportChannels();
+    fetchSupportCountries();
     fetchActiveEmployees();
   }, []);
 
