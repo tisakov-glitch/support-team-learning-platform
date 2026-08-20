@@ -46,7 +46,6 @@ CREATE TABLE IF NOT EXISTS employees (
     phone VARCHAR(64),
     department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
     position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL,
-    rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL,
     course_started_dates JSONB DEFAULT '{}'::jsonb
 );
 
@@ -56,32 +55,11 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT ''
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;
-
--- Clean orphaned rank_id values that do not exist in ranks table
-UPDATE employees 
-SET rank_id = NULL 
-WHERE rank_id IS NOT NULL 
-  AND rank_id NOT IN (SELECT id FROM ranks);
-
--- Now safely add the Foreign Key constraint
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints 
-        WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
-    ) THEN
-        ALTER TABLE employees 
-        ADD CONSTRAINT fk_employees_rank_id 
-        FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
-    END IF;
-EXCEPTION WHEN OTHERS THEN 
-    -- Ignore if constraint cannot be added
-END $$;
+ALTER TABLE employees DROP COLUMN IF EXISTS rank_id CASCADE;
 
 -- Populate first_name, last_name, rank_id and normalize profile JSONB
 DO $$ 
