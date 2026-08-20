@@ -872,7 +872,7 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     console.warn('Notice checking profile column:', err.message);
   }
 
-  // 4. Force Drop legacy name and profile columns
+  // 4. Force Drop legacy name, profile and rank_name columns
   try {
     await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;`);
     console.log('✅ Dropped column name');
@@ -887,6 +887,25 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     console.warn('Notice dropping profile column:', e.message);
   }
 
+  try {
+    const checkRankName = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='rank_name'`);
+    if (checkRankName.rowCount && checkRankName.rowCount > 0) {
+      await client.query(`
+        UPDATE employees e SET rank_id = r.id
+        FROM ranks r
+        WHERE e.rank_id IS NULL AND e.rank_name IS NOT NULL AND r.position_code = e.position_code AND (r.name = e.rank_name OR r.id = e.rank_name);
+
+        UPDATE employees e SET rank_id = r.id
+        FROM ranks r
+        WHERE e.rank_id IS NULL AND e.rank_name IS NOT NULL AND (r.name = e.rank_name OR r.id = e.rank_name);
+      `);
+      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;`);
+      console.log('✅ Migrated rank_name -> rank_id and dropped column rank_name');
+    }
+  } catch (e: any) {
+    console.warn('Notice migrating rank_name to rank_id:', e.message);
+  }
+
   // 5. Populate from memory DB if new columns are still empty
   try {
     const db = readDB();
@@ -898,8 +917,16 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
         const phoneVal = emp.phone || emp.profile?.phone || null;
         const deptVal = emp.departmentId || emp.profile?.departmentId || null;
         const posVal = emp.positionCode || emp.profile?.positionCode || null;
-        const rankVal = emp.rank || emp.profile?.rank || null;
+        const rankVal = emp.rankId || emp.rank || emp.profile?.rankId || emp.profile?.rank || null;
         const bioVal = emp.bio || emp.profile?.bio || null;
+
+        let matchedRankId = emp.rankId || null;
+        if (!matchedRankId && rankVal) {
+          try {
+            const rRes = await client.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rankVal, posVal]);
+            if (rRes.rows[0]) matchedRankId = rRes.rows[0].id;
+          } catch (e) {}
+        }
 
         await client.query(`
           UPDATE employees SET
@@ -908,10 +935,10 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
             phone = COALESCE(phone, $3),
             department_id = COALESCE(department_id, $4),
             position_code = COALESCE(position_code, $5),
-            rank_name = COALESCE(rank_name, $6),
+            rank_id = COALESCE(rank_id, $6),
             bio = COALESCE(bio, $7)
           WHERE id = $8
-        `, [fName, lName, phoneVal, deptVal, posVal, rankVal, bioVal, emp.id]);
+        `, [fName, lName, phoneVal, deptVal, posVal, matchedRankId, bioVal, emp.id]);
       }
       console.log('✅ Synchronized fallback data from local memory state to employees table');
     }
@@ -975,12 +1002,13 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
         e.role, e.status, e.created_at as "createdAt", e.password,
         e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-        e.rank_id as "rankId", e.rank_name as "rankName", e.bio,
+        e.rank_id as "rankId", r.name as "rankName", e.bio,
         e.specializations, e.course_started_dates as "courseStartedDates",
         d.name as "departmentName", p.name as "positionName"
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_code = p.code
+      LEFT JOIN ranks r ON e.rank_id = r.id
     `)).rows;
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
@@ -1280,18 +1308,21 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
       const phone = emp.phone || emp.profile?.phone || null;
       const deptId = emp.departmentId || emp.profile?.departmentId || null;
       const posCode = emp.positionCode || emp.profile?.positionCode || null;
-      const rankName = emp.rank || emp.profile?.rank || null;
-      const rankId = emp.rankId || emp.profile?.rankId || null;
-      const bio = emp.bio || emp.profile?.bio || null;
-      const specs = emp.specializations || emp.profile?.specializations || [];
-      const courseStarts = JSON.stringify(emp.courseStartedDates || emp.profile?.courseStartedDates || {});
+      let rankId = emp.rankId || emp.profile?.rankId || null;
+      const rankVal = emp.rank || emp.profile?.rank;
+      if (!rankId && rankVal) {
+        try {
+          const rRes = await pgPool.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rankVal, posCode]);
+          if (rRes.rows[0]) rankId = rRes.rows[0].id;
+        } catch (e) {}
+      }
 
       await pgPool.query(
         `INSERT INTO employees (
            id, email, first_name, last_name, role, status, created_at, password,
-           phone, department_id, position_code, rank_id, rank_name, bio, specializations, course_started_dates
+           phone, department_id, position_code, rank_id, bio, specializations, course_started_dates
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          ON CONFLICT (id) DO UPDATE SET
            email = EXCLUDED.email,
            first_name = EXCLUDED.first_name,
@@ -1303,7 +1334,6 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
            department_id = EXCLUDED.department_id,
            position_code = EXCLUDED.position_code,
            rank_id = EXCLUDED.rank_id,
-           rank_name = EXCLUDED.rank_name,
            bio = EXCLUDED.bio,
            specializations = EXCLUDED.specializations,
            course_started_dates = EXCLUDED.course_started_dates`,
@@ -1320,7 +1350,6 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
           deptId,
           posCode,
           rankId,
-          rankName,
           bio,
           specs,
           courseStarts
@@ -1547,6 +1576,14 @@ async function startServer() {
     const resolvedPosCode = matchedPos ? matchedPos.code : (positionCode || '13');
     const resolvedPosName = matchedPos ? matchedPos.name : (positionName || 'Support Specialist');
 
+    let resolvedRankId = rankId || null;
+    const rankVal = rank || '';
+    if (!resolvedRankId && rankVal) {
+      const rMatch = (db.ranks || []).find(r => r.id === rankVal || r.name === rankVal);
+      if (rMatch) resolvedRankId = rMatch.id;
+    }
+    const resolvedRankName = (db.ranks || []).find(r => r.id === resolvedRankId)?.name || rankVal;
+
     const profileObj = {
       phone: phone || '',
       department: resolvedDeptName,
@@ -1555,8 +1592,8 @@ async function startServer() {
       bio: bio || '',
       positionCode: resolvedPosCode,
       positionName: resolvedPosName,
-      rank: rank || '',
-      rankId: rankId || ''
+      rank: resolvedRankName,
+      rankId: resolvedRankId || ''
     };
 
     const newEmployee: Employee = {
@@ -1573,8 +1610,8 @@ async function startServer() {
       department: resolvedDeptName,
       positionCode: resolvedPosCode,
       positionName: resolvedPosName,
-      rank: rank || '',
-      rankId: rankId || '',
+      rank: resolvedRankName,
+      rankId: resolvedRankId || '',
       bio: bio || '',
       specializations: specializations || [],
       profile: profileObj
@@ -1584,16 +1621,26 @@ async function startServer() {
     db.employees[id] = newEmployee;
 
     if (pgPool) {
-      pgPool.query(
-        `INSERT INTO employees (
-           id, email, first_name, last_name, role, status, created_at,
-           phone, department_id, position_code, rank_name, bio, specializations
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [
-          id, email, fName, lName, role || 'employee', 'pending', new Date().toISOString(),
-          phone || null, resolvedDeptId, resolvedPosCode, rank || null, bio || null, specializations || []
-        ]
-      ).catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
+      (async () => {
+        let finalRankId = resolvedRankId;
+        if (!finalRankId && rankVal) {
+          try {
+            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rankVal, resolvedPosCode]);
+            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+          } catch (e) {}
+        }
+
+        await pgPool!.query(
+          `INSERT INTO employees (
+             id, email, first_name, last_name, role, status, created_at,
+             phone, department_id, position_code, rank_id, bio, specializations
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            id, email, fName, lName, role || 'employee', 'pending', new Date().toISOString(),
+            phone || null, resolvedDeptId, resolvedPosCode, finalRankId || null, bio || null, specializations || []
+          ]
+        );
+      })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
     }
 
     // Create Onboarding Invitation
@@ -1733,8 +1780,17 @@ async function startServer() {
 
     if (positionCode !== undefined) targetEmployee.positionCode = positionCode;
     if (positionName !== undefined) targetEmployee.positionName = positionName;
-    if (rank !== undefined) targetEmployee.rank = rank;
-    if (rankId !== undefined) targetEmployee.rankId = rankId;
+
+    let resolvedRankId = rankId || targetEmployee.rankId || null;
+    const targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
+    if (!resolvedRankId && targetRankVal) {
+      const rMatch = (db.ranks || []).find(r => r.id === targetRankVal || r.name === targetRankVal);
+      if (rMatch) resolvedRankId = rMatch.id;
+    }
+    const resolvedRankName = (db.ranks || []).find(r => r.id === resolvedRankId)?.name || targetRankVal || '';
+
+    targetEmployee.rank = resolvedRankName;
+    targetEmployee.rankId = resolvedRankId || '';
     if (bio !== undefined) targetEmployee.bio = bio;
     if (specializations !== undefined) targetEmployee.specializations = specializations;
 
@@ -1765,6 +1821,14 @@ async function startServer() {
           } catch (e) {}
         }
 
+        let finalRankId = resolvedRankId;
+        if (!finalRankId && targetRankVal) {
+          try {
+            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, targetEmployee.positionCode || null]);
+            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+          } catch (e) {}
+        }
+
         await pgPool!.query(
           `UPDATE employees SET
              first_name = $1,
@@ -1774,7 +1838,7 @@ async function startServer() {
              phone = $5,
              department_id = $6,
              position_code = $7,
-             rank_name = $8,
+             rank_id = $8,
              bio = $9,
              specializations = $10
            WHERE id = $11`,
@@ -1786,7 +1850,7 @@ async function startServer() {
             targetEmployee.phone || null,
             finalDeptId || null,
             targetEmployee.positionCode || null,
-            targetEmployee.rank || null,
+            finalRankId || null,
             targetEmployee.bio || null,
             targetEmployee.specializations || [],
             id
