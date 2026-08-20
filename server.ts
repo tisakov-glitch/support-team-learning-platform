@@ -891,55 +891,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   } catch (e: any) {
     console.warn('Notice migrating rank_name to rank_id:', e.message);
   }
-
-  // 5. Populate from memory DB if new columns are still empty
-  try {
-    const db = readDB();
-    if (db.employees) {
-      for (const emp of Object.values(db.employees)) {
-        const parts = (emp.name || '').trim().split(/\s+/);
-        const fName = emp.firstName || parts[0] || '';
-        const lName = emp.lastName || parts.slice(1).join(' ') || '';
-        const phoneVal = emp.phone || emp.profile?.phone || null;
-        const deptVal = emp.departmentId || emp.profile?.departmentId || null;
-        const posVal = emp.positionCode || emp.profile?.positionCode || null;
-        const rankVal = emp.rankId || emp.rank || emp.profile?.rankId || emp.profile?.rank || null;
-
-        let matchedRankId = emp.rankId || null;
-        if (!matchedRankId && rankVal) {
-          try {
-            const rRes = await client.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rankVal, posVal]);
-            if (rRes.rows[0]) matchedRankId = rRes.rows[0].id;
-          } catch (e) {}
-        }
-
-        await client.query(`
-          UPDATE employees SET
-            first_name = COALESCE(NULLIF(first_name, ''), $1),
-            last_name = COALESCE(NULLIF(last_name, ''), $2),
-            phone = COALESCE(phone, $3),
-            department_id = COALESCE(department_id, $4),
-            position_code = COALESCE(position_code, $5),
-            rank_id = COALESCE(rank_id, $6)
-          WHERE id = $7
-        `, [fName, lName, phoneVal, deptVal, posVal, matchedRankId, emp.id]);
-      }
-      console.log('✅ Synchronized fallback data from local memory state to employees table');
-    }
-
-    // 6. Ensure rank_id is populated for any employee where rank_id is still NULL
-    await client.query(`
-      UPDATE employees e SET rank_id = r.id
-      FROM ranks r
-      WHERE e.rank_id IS NULL AND r.position_code = e.position_code;
-
-      UPDATE employees SET rank_id = (SELECT id FROM ranks LIMIT 1)
-      WHERE rank_id IS NULL AND (SELECT COUNT(*) FROM ranks) > 0;
-    `);
-    console.log('✅ Auto-populated non-null rank_id for all employees in PostgreSQL');
-  } catch (e: any) {
-    console.warn('Notice synchronizing fallback employee state:', e.message);
-  }
 }
 
 async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
@@ -1839,6 +1790,14 @@ async function startServer() {
             id
           ]
         );
+
+        // Reload fresh state from PostgreSQL
+        try {
+          const freshDb = await loadDBFromPostgresAsync();
+          if (freshDb) {
+            fs.writeFileSync(DB_FILE, JSON.stringify(freshDb, null, 2), 'utf8');
+          }
+        } catch (e) {}
       })().catch(err => console.error('Error directly updating employee in PostgreSQL:', err));
     }
 
