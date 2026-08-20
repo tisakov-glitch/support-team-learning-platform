@@ -3114,9 +3114,13 @@ ${JSON.stringify(validKinds, null, 2)}
     const id = `mod_${Date.now()}`;
     try {
       if (pgPool) {
+        let parentId = systemId;
+        const sysRes = await pgPool.query('SELECT id FROM ticket_category_systems WHERE id = $1 OR name = $1', [systemId]);
+        if (sysRes.rows[0]) parentId = sysRes.rows[0].id;
+
         await pgPool.query(
           `INSERT INTO ticket_category_modules (id, system_id, name) VALUES ($1, $2, $3) ON CONFLICT (system_id, name) DO NOTHING`,
-          [id, systemId, cleanName]
+          [id, parentId, cleanName]
         );
       }
       res.status(201).json({ id, systemId, name: cleanName, types: [] });
@@ -3147,9 +3151,13 @@ ${JSON.stringify(validKinds, null, 2)}
     const id = `typ_${Date.now()}`;
     try {
       if (pgPool) {
+        let parentId = moduleId;
+        const modRes = await pgPool.query('SELECT id FROM ticket_category_modules WHERE id = $1 OR name = $1', [moduleId]);
+        if (modRes.rows[0]) parentId = modRes.rows[0].id;
+
         await pgPool.query(
           `INSERT INTO ticket_category_types (id, module_id, name) VALUES ($1, $2, $3) ON CONFLICT (module_id, name) DO NOTHING`,
-          [id, moduleId, cleanName]
+          [id, parentId, cleanName]
         );
       }
       res.status(201).json({ id, moduleId, name: cleanName, actions: [] });
@@ -3180,9 +3188,13 @@ ${JSON.stringify(validKinds, null, 2)}
     const id = `act_${Date.now()}`;
     try {
       if (pgPool) {
+        let parentId = typeId;
+        const typeRes = await pgPool.query('SELECT id FROM ticket_category_types WHERE id = $1 OR name = $1', [typeId]);
+        if (typeRes.rows[0]) parentId = typeRes.rows[0].id;
+
         await pgPool.query(
           `INSERT INTO ticket_category_actions (id, type_id, name) VALUES ($1, $2, $3) ON CONFLICT (type_id, name) DO NOTHING`,
-          [id, typeId, cleanName]
+          [id, parentId, cleanName]
         );
       }
       res.status(201).json({ id, typeId, name: cleanName });

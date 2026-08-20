@@ -17,15 +17,16 @@ export const TicketCategoryManager: React.FC = () => {
   const [expandedSystems, setExpandedSystems] = useState<Record<string, boolean>>({});
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
-  // Input states for creating items
+  // Input states for creating items (stored by unique key to prevent multi-open bug)
   const [newSystemName, setNewSystemName] = useState('');
-  const [addingModuleForSysId, setAddingModuleForSysId] = useState<string | null>(null);
+  
+  const [addingModuleForSysKey, setAddingModuleForSysKey] = useState<string | null>(null);
   const [newModuleName, setNewModuleName] = useState('');
 
-  const [addingTypeForModId, setAddingTypeForModId] = useState<string | null>(null);
+  const [addingTypeForModKey, setAddingTypeForModKey] = useState<string | null>(null);
   const [newTypeName, setNewTypeName] = useState('');
 
-  const [addingActionForTypeId, setAddingActionForTypeId] = useState<string | null>(null);
+  const [addingActionForTypeKey, setAddingActionForTypeKey] = useState<string | null>(null);
   const [newActionName, setNewActionName] = useState('');
 
   const fetchCategories = async () => {
@@ -41,10 +42,10 @@ export const TicketCategoryManager: React.FC = () => {
       const initialSys: Record<string, boolean> = {};
       const initialMods: Record<string, boolean> = {};
       data.forEach((sys: any) => {
-        const sysKey = sys.id || sys.name;
+        const sysKey = sys.id || `sys_${sys.name}`;
         initialSys[sysKey] = true;
         (sys.modules || []).forEach((mod: any) => {
-          const modKey = mod.id || mod.name;
+          const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
           initialMods[modKey] = true;
         });
       });
@@ -106,20 +107,20 @@ export const TicketCategoryManager: React.FC = () => {
     }
   };
 
-  const handleAddModule = async (systemId: string) => {
+  const handleAddModule = async (systemIdOrName: string) => {
     if (!newModuleName.trim()) return;
     setError(''); setSuccess('');
     try {
       const res = await fetch('/api/ticket-categories/modules', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ systemId, name: newModuleName.trim() })
+        body: JSON.stringify({ systemId: systemIdOrName, name: newModuleName.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка создания модуля');
       setSuccess(`Модуль "${newModuleName}" добавлен!`);
       setNewModuleName('');
-      setAddingModuleForSysId(null);
+      setAddingModuleForSysKey(null);
       fetchCategories();
     } catch (err: any) {
       setError(err.message);
@@ -142,20 +143,20 @@ export const TicketCategoryManager: React.FC = () => {
     }
   };
 
-  const handleAddType = async (moduleId: string) => {
+  const handleAddType = async (moduleIdOrName: string) => {
     if (!newTypeName.trim()) return;
     setError(''); setSuccess('');
     try {
       const res = await fetch('/api/ticket-categories/types', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ moduleId, name: newTypeName.trim() })
+        body: JSON.stringify({ moduleId: moduleIdOrName, name: newTypeName.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка создания типа');
       setSuccess(`Тип "${newTypeName}" добавлен!`);
       setNewTypeName('');
-      setAddingTypeForModId(null);
+      setAddingTypeForModKey(null);
       fetchCategories();
     } catch (err: any) {
       setError(err.message);
@@ -178,20 +179,20 @@ export const TicketCategoryManager: React.FC = () => {
     }
   };
 
-  const handleAddAction = async (typeId: string) => {
+  const handleAddAction = async (typeIdOrName: string) => {
     if (!newActionName.trim()) return;
     setError(''); setSuccess('');
     try {
       const res = await fetch('/api/ticket-categories/actions', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ typeId, name: newActionName.trim() })
+        body: JSON.stringify({ typeId: typeIdOrName, name: newActionName.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка создания действия');
       setSuccess(`Действие "${newActionName}" добавлено!`);
       setNewActionName('');
-      setAddingActionForTypeId(null);
+      setAddingActionForTypeKey(null);
       fetchCategories();
     } catch (err: any) {
       setError(err.message);
@@ -218,10 +219,10 @@ export const TicketCategoryManager: React.FC = () => {
     const sysMap: Record<string, boolean> = {};
     const modMap: Record<string, boolean> = {};
     categories.forEach((sys: any) => {
-      const sysKey = sys.id || sys.name;
+      const sysKey = sys.id || `sys_${sys.name}`;
       sysMap[sysKey] = true;
       (sys.modules || []).forEach((mod: any) => {
-        const modKey = mod.id || mod.name;
+        const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
         modMap[modKey] = true;
       });
     });
@@ -233,10 +234,10 @@ export const TicketCategoryManager: React.FC = () => {
     const sysMap: Record<string, boolean> = {};
     const modMap: Record<string, boolean> = {};
     categories.forEach((sys: any) => {
-      const sysKey = sys.id || sys.name;
+      const sysKey = sys.id || `sys_${sys.name}`;
       sysMap[sysKey] = false;
       (sys.modules || []).forEach((mod: any) => {
-        const modKey = mod.id || mod.name;
+        const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
         modMap[modKey] = false;
       });
     });
@@ -323,8 +324,9 @@ export const TicketCategoryManager: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {categories.map((sys: any) => {
-            const sysKey = sys.id || sys.name;
+            const sysKey = sys.id || `sys_${sys.name}`;
             const isSysExpanded = expandedSystems[sysKey] ?? true;
+            const isAddingModule = addingModuleForSysKey === sysKey;
 
             return (
               <div key={sysKey} className="bg-white border border-[#C9B87A]/30 rounded-2xl overflow-hidden shadow-xs">
@@ -348,7 +350,7 @@ export const TicketCategoryManager: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setAddingModuleForSysId(addingModuleForSysId === sys.id ? null : sys.id)}
+                      onClick={() => setAddingModuleForSysKey(isAddingModule ? null : sysKey)}
                       className="px-3 py-1 bg-[#F5EFD7] hover:bg-white text-[#0F172A] rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5 text-[#A08C4A]" />
@@ -368,7 +370,7 @@ export const TicketCategoryManager: React.FC = () => {
                 </div>
 
                 {/* Inline Form for Adding Module */}
-                {addingModuleForSysId === sys.id && (
+                {isAddingModule && (
                   <div className="p-4 bg-[#F5EFD7]/30 border-b border-[#C9B87A]/30 flex items-center gap-3">
                     <span className="text-xs font-bold text-[#0F172A]">Новый модуль для {sys.name}:</span>
                     <input
@@ -380,14 +382,14 @@ export const TicketCategoryManager: React.FC = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => handleAddModule(sys.id)}
+                      onClick={() => handleAddModule(sys.id || sys.name)}
                       className="px-4 py-1.5 bg-[#0F172A] text-white text-xs font-bold rounded-lg hover:bg-[#1E293B] cursor-pointer"
                     >
                       Сохранить
                     </button>
                     <button
                       type="button"
-                      onClick={() => setAddingModuleForSysId(null)}
+                      onClick={() => setAddingModuleForSysKey(null)}
                       className="px-3 py-1.5 text-xs text-slate-500 font-bold hover:text-slate-800 cursor-pointer"
                     >
                       Отмена
@@ -399,8 +401,9 @@ export const TicketCategoryManager: React.FC = () => {
                 {isSysExpanded && (
                   <div className="p-5 space-y-4">
                     {(sys.modules || []).map((mod: any) => {
-                      const modKey = mod.id || mod.name;
+                      const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
                       const isModExpanded = expandedModules[modKey] ?? true;
+                      const isAddingType = addingTypeForModKey === modKey;
 
                       return (
                         <div key={modKey} className="bg-[#F7F5F2]/60 border border-[#C9B87A]/25 rounded-xl p-4 space-y-3">
@@ -410,7 +413,7 @@ export const TicketCategoryManager: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setExpandedModules(prev => ({ ...prev, [modKey]: !isModExpanded }))}
-                                className="p-0.5 text-slate-400 hover:text-slate-700"
+                                className="p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
                               >
                                 {isModExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                               </button>
@@ -424,7 +427,7 @@ export const TicketCategoryManager: React.FC = () => {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setAddingTypeForModId(addingTypeForModId === mod.id ? null : mod.id)}
+                                onClick={() => setAddingTypeForModKey(isAddingType ? null : modKey)}
                                 className="px-2.5 py-1 bg-white hover:bg-[#F5EFD7] border border-[#C9B87A]/40 text-[#0F172A] rounded-md text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
                               >
                                 <Plus className="w-3 h-3 text-[#A08C4A]" />
@@ -434,7 +437,7 @@ export const TicketCategoryManager: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteModule(mod.id, mod.name)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50"
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -443,7 +446,7 @@ export const TicketCategoryManager: React.FC = () => {
                           </div>
 
                           {/* Inline Form for Adding Type */}
-                          {addingTypeForModId === mod.id && (
+                          {isAddingType && (
                             <div className="p-3 bg-white border border-[#C9B87A]/40 rounded-lg flex items-center gap-2">
                               <input
                                 type="text"
@@ -454,10 +457,17 @@ export const TicketCategoryManager: React.FC = () => {
                               />
                               <button
                                 type="button"
-                                onClick={() => handleAddType(mod.id)}
+                                onClick={() => handleAddType(mod.id || mod.name)}
                                 className="px-3 py-1 bg-[#0F172A] text-white text-xs font-bold rounded cursor-pointer"
                               >
                                 Добавить тип
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAddingTypeForModKey(null)}
+                                className="px-2 py-1 text-xs text-slate-500 font-bold hover:text-slate-800 cursor-pointer"
+                              >
+                                Отмена
                               </button>
                             </div>
                           )}
@@ -465,67 +475,92 @@ export const TicketCategoryManager: React.FC = () => {
                           {/* Types list */}
                           {isModExpanded && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4">
-                              {(mod.types || []).map((typ: any) => (
-                                <div key={typ.id || typ.name} className="bg-white border border-slate-200/80 rounded-lg p-3 space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                      <FileCode className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span>{typ.name}</span>
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => setAddingActionForTypeId(addingActionForTypeId === typ.id ? null : typ.id)}
-                                        className="p-1 text-indigo-600 hover:bg-indigo-50 rounded text-[10px] font-bold flex items-center gap-1"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                        <span>Действие</span>
-                                      </button>
-                                      {typ.id && (
+                              {(mod.types || []).map((typ: any) => {
+                                const typeKey = typ.id || `${modKey}_typ_${typ.name}`;
+                                const isAddingAction = addingActionForTypeKey === typeKey;
+
+                                return (
+                                  <div key={typeKey} className="bg-white border border-slate-200/80 rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <FileCode className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span>{typ.name}</span>
+                                      </span>
+                                      <div className="flex items-center gap-1">
                                         <button
                                           type="button"
-                                          onClick={() => handleDeleteType(typ.id, typ.name)}
-                                          className="p-1 text-slate-400 hover:text-rose-500 rounded"
+                                          onClick={() => setAddingActionForTypeKey(isAddingAction ? null : typeKey)}
+                                          className="p-1 text-indigo-600 hover:bg-indigo-50 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Plus className="w-3 h-3" />
+                                          <span>Действие</span>
                                         </button>
+                                        {typ.id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteType(typ.id, typ.name)}
+                                            className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Actions Tags */}
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                      {(typ.actions || []).map((act: any, aIdx: number) => {
+                                        const actName = typeof act === 'string' ? act : act.name;
+                                        const actId = typeof act === 'object' ? act.id : null;
+                                        return (
+                                          <span key={aIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded text-[10px] font-medium flex items-center gap-1">
+                                            <span>{actName}</span>
+                                            {actId && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteAction(actId, actName)}
+                                                className="text-indigo-400 hover:text-rose-600 ml-1 cursor-pointer"
+                                              >
+                                                ×
+                                              </button>
+                                            )}
+                                          </span>
+                                        );
+                                      })}
+                                      {(!typ.actions || typ.actions.length === 0) && (
+                                        <span className="text-[10px] text-slate-400 italic">Без выпадающих действий</span>
                                       )}
                                     </div>
-                                  </div>
 
-                                  {/* Actions Tags */}
-                                  <div className="flex flex-wrap gap-1.5 pt-1">
-                                    {(typ.actions || []).map((act: string, aIdx: number) => (
-                                      <span key={aIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded text-[10px] font-medium flex items-center gap-1">
-                                        <span>{act}</span>
-                                      </span>
-                                    ))}
-                                    {(!typ.actions || typ.actions.length === 0) && (
-                                      <span className="text-[10px] text-slate-400 italic">Без выпадающих действий</span>
+                                    {/* Inline Form for Adding Action */}
+                                    {isAddingAction && (
+                                      <div className="mt-2 pt-2 border-t flex items-center gap-2">
+                                        <input
+                                          type="text"
+                                          placeholder="Название действия"
+                                          value={newActionName}
+                                          onChange={(e) => setNewActionName(e.target.value)}
+                                          className="px-2 py-1 bg-slate-50 border rounded text-[11px] flex-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAddAction(typ.id || typ.name)}
+                                          className="px-2.5 py-1 bg-indigo-600 text-white text-[11px] font-bold rounded cursor-pointer hover:bg-indigo-700"
+                                        >
+                                          OK
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setAddingActionForTypeKey(null)}
+                                          className="px-1.5 py-1 text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
-
-                                  {/* Inline Form for Adding Action */}
-                                  {addingActionForTypeId === typ.id && (
-                                    <div className="mt-2 pt-2 border-t flex items-center gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="Название действия"
-                                        value={newActionName}
-                                        onChange={(e) => setNewActionName(e.target.value)}
-                                        className="px-2 py-1 bg-slate-50 border rounded text-[11px] flex-1"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleAddAction(typ.id)}
-                                        className="px-2 py-1 bg-indigo-600 text-white text-[11px] font-bold rounded"
-                                      >
-                                        OK
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
+                                );
+                              })}
                               {(mod.types || []).length === 0 && (
                                 <span className="text-xs text-slate-400 italic col-span-2">В данном модуле пока нет типов</span>
                               )}
