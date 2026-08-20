@@ -27,18 +27,31 @@ const smtpUser = process.env.SMTP_USER || 'notifications@retmind.com';
 const smtpPass = process.env.SMTP_PASS || 'mkcykiprudlrctob';
 const smtpFrom = process.env.SMTP_FROM || '"Support Team Learning" <notifications@retmind.com>';
 
-const mailTransporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpSecure,
-  auth: {
-    user: smtpUser,
-    pass: smtpPass
+let mailTransporter: any = null;
+try {
+  const nm: any = nodemailer;
+  const createFn = nm.createTransport || nm.default?.createTransport;
+  if (typeof createFn === 'function') {
+    mailTransporter = createFn({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      }
+    });
   }
-});
+} catch (e) {
+  console.warn('⚠️ SMTP Transporter init warning:', e);
+}
 
 // Helper function to send real SMTP email
 async function sendRealSmtpEmail(options: { to: string; subject: string; text: string; html?: string }) {
+  if (!mailTransporter) {
+    console.warn('⚠️ [SMTP] Mail transporter not initialized. Email skipped for:', options.to);
+    return { success: false, error: 'Mail transporter not initialized' };
+  }
   try {
     const info = await mailTransporter.sendMail({
       from: smtpFrom,
