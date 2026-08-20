@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS ranks (
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+GRANT ALL ON TABLE ranks TO PUBLIC;
 
 -- 4. Employees Table (Normalized)
 CREATE TABLE IF NOT EXISTS employees (

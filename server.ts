@@ -973,7 +973,6 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         LEFT JOIN ranks r ON e.rank_id = r.id
       `)).rows;
     } catch (e: any) {
-      console.warn('Notice querying employees with ranks join:', e.message);
       employeesRows = (await client.query(`
         SELECT 
           e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
