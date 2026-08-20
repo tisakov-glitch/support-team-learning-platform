@@ -14,11 +14,11 @@ import {
 } from 'lucide-react';
 import { Employee, SimulatedEmail, UserRole, DepartmentDefinition, RoleDefinition, PositionDefinition, Course, Lesson, LessonGrade, CourseBinding, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportChannel, SupportClient, SupportStore, SupportKind, SupportCountry } from '../types';
 import { TICKET_CATEGORIES } from '../ticketCategories';
-import { VoiceTicketRecorder } from './VoiceTicketRecorder';
 import { ImageTicketAnalyzer } from './ImageTicketAnalyzer';
 import { TicketRegistrationForm } from './TicketRegistrationForm';
 import { TicketReports } from './TicketReports';
 import { InteractivePieChart } from './InteractivePieChart';
+import { TicketCategoryManager } from './TicketCategoryManager';
 import { BarChart3 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -318,7 +318,7 @@ export default function AdminDashboard({
   const [supportKinds, setSupportKinds] = useState<SupportKind[]>([]);
   const [supportCountries, setSupportCountries] = useState<SupportCountry[]>([]);
   const [isSupportLoading, setIsSupportLoading] = useState(false);
-  const [ticketAcademySubTab, setTicketAcademySubTab] = useState<'tickets' | 'channels' | 'clients' | 'stores' | 'kinds' | 'countries'>('tickets');
+  const [ticketAcademySubTab, setTicketAcademySubTab] = useState<'tickets' | 'channels' | 'clients' | 'stores' | 'kinds' | 'countries' | 'categories'>('tickets');
 
   // Support Countries Form State
   const [newCountryCode, setNewCountryCode] = useState('');
@@ -6050,6 +6050,17 @@ export default function AdminDashboard({
                 >
                   Страны
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTicketAcademySubTab('categories')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    ticketAcademySubTab === 'categories'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Матрица категорий
+                </button>
               </div>
             </div>
 
@@ -7586,6 +7597,8 @@ export default function AdminDashboard({
                   </div>
                 </div>
               </div>
+            {ticketAcademySubTab === 'categories' && (
+              <TicketCategoryManager />
             )}
           </div>
         )}

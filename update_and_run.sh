@@ -32,6 +32,13 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
+echo "🗄️ Applying PostgreSQL database DDL migrations..."
+if [ -n "$DATABASE_URL" ]; then
+  psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
+else
+  psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
+fi
+
 MODE="${1:-prod}"
 
 if [ "$MODE" = "dev" ]; then
@@ -46,4 +53,3 @@ else
   nohup env PORT=3000 NODE_ENV=production npm start > app.log 2>&1 &
   echo "✅ App running in background (PID: $!). View logs with: tail -f app.log"
 fi
-

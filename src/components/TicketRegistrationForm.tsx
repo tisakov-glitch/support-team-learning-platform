@@ -60,6 +60,19 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
   const [assignedToId, setAssignedToId] = useState('');
   const [assignedToName, setAssignedToName] = useState('');
 
+  const [categories, setCategories] = useState(TICKET_CATEGORIES);
+
+  useEffect(() => {
+    fetch('/api/ticket-categories')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCategories(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -198,7 +211,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
     }
 
     if (data.system) {
-      const matchedSys = TICKET_CATEGORIES.find(sys => sys.name.toLowerCase() === data.system.toLowerCase());
+      const matchedSys = categories.find(sys => sys.name.toLowerCase() === data.system.toLowerCase());
       if (matchedSys) {
         setSystem(matchedSys.name);
         if (data.module) {
@@ -304,7 +317,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
     ? activeClientObj.countries
     : (supportCountries || []).map(cnt => cnt.name);
 
-  const selectedSys = TICKET_CATEGORIES.find(s => s.name === system);
+  const selectedSys = categories.find(s => s.name === system);
   const selectedMod = selectedSys?.modules.find(m => m.name === moduleName);
   const selectedType = selectedMod?.types.find(t => t.name === typeName);
 
@@ -543,7 +556,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
           >
             <option value="">-- Выберите систему --</option>
-            {TICKET_CATEGORIES.map(sys => (
+            {categories.map(sys => (
               <option key={sys.id} value={sys.name}>{sys.name}</option>
             ))}
           </select>

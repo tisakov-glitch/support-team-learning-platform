@@ -172,6 +172,44 @@ CREATE TABLE IF NOT EXISTS support_kinds (
     name VARCHAR(255) NOT NULL
 );
 
+-- 15. Ticket Category Systems Table
+CREATE TABLE IF NOT EXISTS ticket_category_systems (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 16. Ticket Category Modules Table
+CREATE TABLE IF NOT EXISTS ticket_category_modules (
+    id VARCHAR(64) PRIMARY KEY,
+    system_id VARCHAR(64) REFERENCES ticket_category_systems(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_system_module_name UNIQUE (system_id, name)
+);
+
+-- 17. Ticket Category Types Table
+CREATE TABLE IF NOT EXISTS ticket_category_types (
+    id VARCHAR(64) PRIMARY KEY,
+    module_id VARCHAR(64) REFERENCES ticket_category_modules(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_module_type_name UNIQUE (module_id, name)
+);
+
+-- 18. Ticket Category Actions Table
+CREATE TABLE IF NOT EXISTS ticket_category_actions (
+    id VARCHAR(64) PRIMARY KEY,
+    type_id VARCHAR(64) REFERENCES ticket_category_types(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_type_action_name UNIQUE (type_id, name)
+);
+
 -- Grant privileges if allowed
 DO $$ 
 BEGIN

@@ -19,6 +19,137 @@ import nodemailer from 'nodemailer';
 
 dotenv.config();
 
+async function ensureTicketCategoriesSeeded(pool: any) {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ticket_category_systems (
+          id VARCHAR(64) PRIMARY KEY,
+          name VARCHAR(255) UNIQUE NOT NULL,
+          display_order INT DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS ticket_category_modules (
+          id VARCHAR(64) PRIMARY KEY,
+          system_id VARCHAR(64) REFERENCES ticket_category_systems(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          display_order INT DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_system_module_name UNIQUE (system_id, name)
+      );
+      CREATE TABLE IF NOT EXISTS ticket_category_types (
+          id VARCHAR(64) PRIMARY KEY,
+          module_id VARCHAR(64) REFERENCES ticket_category_modules(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          display_order INT DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_module_type_name UNIQUE (module_id, name)
+      );
+      CREATE TABLE IF NOT EXISTS ticket_category_actions (
+          id VARCHAR(64) PRIMARY KEY,
+          type_id VARCHAR(64) REFERENCES ticket_category_types(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          display_order INT DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_type_action_name UNIQUE (type_id, name)
+      );
+    `);
+
+    const existingSystems = await pool.query('SELECT COUNT(*) FROM ticket_category_systems');
+    if (parseInt(existingSystems.rows[0].count, 10) === 0) {
+      console.log('🌱 Seeding ticket categories from TICKET_CATEGORIES into PostgreSQL...');
+      let sysOrder = 0;
+      for (const sys of TICKET_CATEGORIES) {
+        sysOrder++;
+        const sysId = `sys_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        await pool.query(
+          `INSERT INTO ticket_category_systems (id, name, display_order) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING`,
+          [sysId, sys.name, sysOrder]
+        );
+        const sysRow = (await pool.query(`SELECT id FROM ticket_category_systems WHERE name = $1`, [sys.name])).rows[0];
+        if (!sysRow) continue;
+
+        let modOrder = 0;
+        for (const mod of sys.modules || []) {
+          modOrder++;
+          const modId = `mod_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+          await pool.query(
+            `INSERT INTO ticket_category_modules (id, system_id, name, display_order) VALUES ($1, $2, $3, $4) ON CONFLICT (system_id, name) DO NOTHING`,
+            [modId, sysRow.id, mod.name, modOrder]
+          );
+          const modRow = (await pool.query(`SELECT id FROM ticket_category_modules WHERE system_id = $1 AND name = $2`, [sysRow.id, mod.name])).rows[0];
+          if (!modRow) continue;
+
+          let typeOrder = 0;
+          for (const t of mod.types || []) {
+            typeOrder++;
+            const typeId = `typ_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            await pool.query(
+              `INSERT INTO ticket_category_types (id, module_id, name, display_order) VALUES ($1, $2, $3, $4) ON CONFLICT (module_id, name) DO NOTHING`,
+              [typeId, modRow.id, t.name, typeOrder]
+            );
+            const typeRow = (await pool.query(`SELECT id FROM ticket_category_types WHERE module_id = $1 AND name = $2`, [modRow.id, t.name])).rows[0];
+            if (!typeRow) continue;
+
+            let actOrder = 0;
+            for (const actName of t.actions || []) {
+              actOrder++;
+              const actId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+              await pool.query(
+                `INSERT INTO ticket_category_actions (id, type_id, name, display_order) VALUES ($1, $2, $3, $4) ON CONFLICT (type_id, name) DO NOTHING`,
+                [actId, typeRow.id, actName, actOrder]
+              );
+            }
+          }
+        }
+      }
+      console.log('✅ Ticket categories successfully seeded into PostgreSQL!');
+    }
+  } catch (err) {
+    console.error('Error seeding ticket categories:', err);
+  }
+}
+
+async function fetchTicketCategoriesFromDB(pool: any) {
+  if (!pool) return TICKET_CATEGORIES;
+  try {
+    const systemsRes = await pool.query(`SELECT id, name, display_order FROM ticket_category_systems ORDER BY display_order ASC, name ASC`);
+    const modulesRes = await pool.query(`SELECT id, system_id, name, display_order FROM ticket_category_modules ORDER BY display_order ASC, name ASC`);
+    const typesRes = await pool.query(`SELECT id, module_id, name, display_order FROM ticket_category_types ORDER BY display_order ASC, name ASC`);
+    const actionsRes = await pool.query(`SELECT id, type_id, name, display_order FROM ticket_category_actions ORDER BY display_order ASC, name ASC`);
+
+    const systems = systemsRes.rows;
+    const modules = modulesRes.rows;
+    const types = typesRes.rows;
+    const actions = actionsRes.rows;
+
+    if (systems.length === 0) return TICKET_CATEGORIES;
+
+    return systems.map((sys: any) => ({
+      id: sys.id,
+      name: sys.name,
+      modules: modules
+        .filter((m: any) => m.system_id === sys.id)
+        .map((mod: any) => ({
+          id: mod.id,
+          name: mod.name,
+          types: types
+            .filter((t: any) => t.module_id === mod.id)
+            .map((typ: any) => ({
+              id: typ.id,
+              name: typ.name,
+              actions: actions
+                .filter((a: any) => a.type_id === typ.id)
+                .map((a: any) => a.name)
+            }))
+        }))
+    }));
+  } catch (err) {
+    console.error('Error fetching ticket categories from DB:', err);
+    return TICKET_CATEGORIES;
+  }
+}
+
 // Nodemailer SMTP Transporter setup (Yandex SMTP)
 const smtpHost = process.env.SMTP_HOST || 'smtp.yandex.ru';
 const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -966,6 +1097,8 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
         );
       } catch (err) {}
     }
+
+    await ensureTicketCategoriesSeeded(pgPool);
     for (const pos of data.positions || []) {
       await pgPool.query(
         `INSERT INTO positions (code, name, department_id, role_code)
@@ -2926,6 +3059,148 @@ ${JSON.stringify(validKinds, null, 2)}
       pgPool.query('DELETE FROM support_kinds WHERE id = $1', [id]).catch(e => console.error(e));
     }
     res.json({ success: true, message: 'Вид тикета успешно удален' });
+  });
+
+  // --- Ticket Categories CRUD (Systems, Modules, Types, Actions) ---
+  app.get('/api/ticket-categories', async (req, res) => {
+    try {
+      const categories = await fetchTicketCategoriesFromDB(pgPool);
+      res.json(categories);
+    } catch (err: any) {
+      res.json(TICKET_CATEGORIES);
+    }
+  });
+
+  app.post('/api/ticket-categories/systems', authenticateUser, requireAdmin, async (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: 'Название системы обязательно' });
+      return;
+    }
+    const cleanName = name.trim();
+    const id = `sys_${Date.now()}`;
+    try {
+      if (pgPool) {
+        await pgPool.query(
+          `INSERT INTO ticket_category_systems (id, name) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+          [id, cleanName]
+        );
+      }
+      res.status(201).json({ id, name: cleanName, modules: [] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка создания системы' });
+    }
+  });
+
+  app.delete('/api/ticket-categories/systems/:id', authenticateUser, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      if (pgPool) {
+        await pgPool.query(`DELETE FROM ticket_category_systems WHERE id = $1`, [id]);
+      }
+      res.json({ success: true, message: 'Система успешно удалена' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка удаления системы' });
+    }
+  });
+
+  app.post('/api/ticket-categories/modules', authenticateUser, requireAdmin, async (req, res) => {
+    const { systemId, name } = req.body;
+    if (!systemId || !name || !name.trim()) {
+      res.status(400).json({ error: 'ID системы и Название модуля обязательны' });
+      return;
+    }
+    const cleanName = name.trim();
+    const id = `mod_${Date.now()}`;
+    try {
+      if (pgPool) {
+        await pgPool.query(
+          `INSERT INTO ticket_category_modules (id, system_id, name) VALUES ($1, $2, $3) ON CONFLICT (system_id, name) DO NOTHING`,
+          [id, systemId, cleanName]
+        );
+      }
+      res.status(201).json({ id, systemId, name: cleanName, types: [] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка создания модуля' });
+    }
+  });
+
+  app.delete('/api/ticket-categories/modules/:id', authenticateUser, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      if (pgPool) {
+        await pgPool.query(`DELETE FROM ticket_category_modules WHERE id = $1`, [id]);
+      }
+      res.json({ success: true, message: 'Модуль успешно удален' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка удаления модуля' });
+    }
+  });
+
+  app.post('/api/ticket-categories/types', authenticateUser, requireAdmin, async (req, res) => {
+    const { moduleId, name } = req.body;
+    if (!moduleId || !name || !name.trim()) {
+      res.status(400).json({ error: 'ID модуля и Название типа обязательны' });
+      return;
+    }
+    const cleanName = name.trim();
+    const id = `typ_${Date.now()}`;
+    try {
+      if (pgPool) {
+        await pgPool.query(
+          `INSERT INTO ticket_category_types (id, module_id, name) VALUES ($1, $2, $3) ON CONFLICT (module_id, name) DO NOTHING`,
+          [id, moduleId, cleanName]
+        );
+      }
+      res.status(201).json({ id, moduleId, name: cleanName, actions: [] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка создания типа' });
+    }
+  });
+
+  app.delete('/api/ticket-categories/types/:id', authenticateUser, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      if (pgPool) {
+        await pgPool.query(`DELETE FROM ticket_category_types WHERE id = $1`, [id]);
+      }
+      res.json({ success: true, message: 'Тип обращения успешно удален' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка удаления типа' });
+    }
+  });
+
+  app.post('/api/ticket-categories/actions', authenticateUser, requireAdmin, async (req, res) => {
+    const { typeId, name } = req.body;
+    if (!typeId || !name || !name.trim()) {
+      res.status(400).json({ error: 'ID типа и Название действия обязательны' });
+      return;
+    }
+    const cleanName = name.trim();
+    const id = `act_${Date.now()}`;
+    try {
+      if (pgPool) {
+        await pgPool.query(
+          `INSERT INTO ticket_category_actions (id, type_id, name) VALUES ($1, $2, $3) ON CONFLICT (type_id, name) DO NOTHING`,
+          [id, typeId, cleanName]
+        );
+      }
+      res.status(201).json({ id, typeId, name: cleanName });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка создания действия' });
+    }
+  });
+
+  app.delete('/api/ticket-categories/actions/:id', authenticateUser, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+      if (pgPool) {
+        await pgPool.query(`DELETE FROM ticket_category_actions WHERE id = $1`, [id]);
+      }
+      res.json({ success: true, message: 'Действие успешно удалено' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Ошибка удаления действия' });
+    }
   });
 
   // --- Support Countries CRUD ---
