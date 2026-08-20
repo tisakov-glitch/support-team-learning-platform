@@ -5,14 +5,14 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Mail, Lock, User, CheckCircle2, ArrowRight, HelpCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, ShieldCheck, Globe, Sparkles } from 'lucide-react';
 
 interface LoginProps {
   onLoginSuccess: (user: any, token: string) => void;
-  openEmailSimulator: () => void;
+  openEmailSimulator?: () => void;
 }
 
-export default function Login({ onLoginSuccess, openEmailSimulator }: LoginProps) {
+export default function Login({ onLoginSuccess }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -49,62 +49,89 @@ export default function Login({ onLoginSuccess, openEmailSimulator }: LoginProps
     }
   };
 
-  const handleQuickSelect = (testEmail: string, testPass: string) => {
-    setEmail(testEmail);
-    setPassword(testPass);
-    setError('');
-  };
-
   return (
-    <div id="login-container" className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 text-slate-800 selection:bg-indigo-600 selection:text-white relative overflow-hidden">
-      {/* Decorative background grid and minimalist blurs */}
-      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-70 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-slate-200/40 rounded-full blur-3xl pointer-events-none" />
+    <div id="login-container" className="min-h-screen flex flex-col items-center justify-between p-4 md:p-8 bg-[#E1DEDB] text-[#0F172A] relative overflow-hidden selection:bg-[#C9B87A] selection:text-[#0F172A]">
+      {/* Retmind Brand Background Geometry */}
+      <div className="absolute inset-0 pointer-events-none select-none opacity-40">
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-[#C9B87A]/20 to-transparent blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-[#C9B87A]/15 to-transparent blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(#C9B87A_1px,transparent_1px)] [background-size:32px_32px] opacity-20" />
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md z-10"
-      >
-        <div className="text-center mb-8">
-          <div className="inline-flex p-4 rounded-2xl bg-white text-indigo-600 mb-4 border border-slate-200 shadow-sm">
-            <Shield className="w-8 h-8" />
+      {/* Top Header Navigation Bar */}
+      <header className="w-full max-w-6xl flex items-center justify-between z-10 py-4 border-b border-[#C9B87A]/30">
+        <div className="flex items-center gap-3">
+          {/* Retmind SVG Logo Lockup */}
+          <div className="flex items-center gap-2.5">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <rect x="2" y="2" width="32" height="32" rx="6" fill="#0F172A" />
+              <path d="M12 10H24V14H12V10Z" fill="#C9B87A" />
+              <path d="M12 16H24V20H12V16Z" fill="#E1DEDB" fillOpacity="0.8" />
+              <path d="M12 22H18V26H12V22Z" fill="#C9B87A" />
+              <circle cx="23" cy="24" r="2" fill="#C9B87A" />
+            </svg>
+            <div>
+              <span className="text-lg font-black uppercase tracking-[0.2em] text-[#0F172A] block leading-none">
+                RETMIND
+              </span>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#A08C4A] block mt-0.5">
+                Senior IT & Retail Solutions
+              </span>
+            </div>
           </div>
-          <h1 className="text-3xl font-light text-slate-900 tracking-tight">
-            Support Learning Platform
-          </h1>
-          <p className="text-sm text-slate-400 mt-2">
-            Система обучения и адаптации службы поддержки
-          </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div className="p-6 md:p-8">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-              <User className="w-4 h-4 text-indigo-600" />
-              Авторизация в системе
-            </h2>
+        <div className="hidden sm:flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#0F172A]/70">
+          <span className="flex items-center gap-1.5 bg-[#F5EFD7] px-3 py-1.5 rounded-full border border-[#C9B87A]/40 text-[#0F172A]">
+            <Globe className="w-3.5 h-3.5 text-[#A08C4A]" />
+            <span>Support & Learning Academy</span>
+          </span>
+        </div>
+      </header>
+
+      {/* Main Login Card Section */}
+      <main className="w-full max-w-md my-auto z-10 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="bg-white border border-[#C9B87A]/40 rounded-3xl shadow-2xl shadow-[#0F172A]/10 overflow-hidden"
+        >
+          {/* Card Gold Accent Line */}
+          <div className="h-1.5 bg-gradient-to-r from-[#C9B87A] via-[#0F172A] to-[#C9B87A]" />
+
+          <div className="p-8 sm:p-10">
+            {/* Header Title inside card */}
+            <div className="text-center mb-8">
+              <div className="inline-flex p-3 rounded-2xl bg-[#F5EFD7] text-[#0F172A] mb-3 border border-[#C9B87A]/40 shadow-xs">
+                <ShieldCheck className="w-6 h-6 text-[#A08C4A]" />
+              </div>
+              <h1 className="text-xl font-bold uppercase tracking-[0.12em] text-[#0F172A]">
+                Вход в систему
+              </h1>
+              <p className="text-xs text-[#0F172A]/60 mt-1.5 tracking-wide">
+                Единая платформа поддержки и развития персонала Retmind
+              </p>
+            </div>
 
             {error && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-rose-50 border border-rose-100 text-rose-700 text-xs p-3.5 rounded-xl mb-6 flex items-start gap-2"
+                className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-4 rounded-2xl mb-6 flex items-center gap-3"
               >
-                <div className="text-rose-500 font-bold mt-0.5 font-mono">!</div>
-                <p>{error}</p>
+                <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                <p className="font-medium">{error}</p>
               </motion.div>
             )}
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Электронная почта (Email)
+                <label className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#0F172A]/60 mb-2">
+                  Корпоративная почта (Email)
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-[#A08C4A]">
                     <Mail className="w-4 h-4" />
                   </span>
                   <input
@@ -112,19 +139,19 @@ export default function Login({ onLoginSuccess, openEmailSimulator }: LoginProps
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@support.edu"
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+                    placeholder="firstname.lastname@retmind.com"
+                    className="w-full pl-11 pr-4 py-3.5 bg-[#F7F5F2] border border-[#C9B87A]/40 rounded-2xl text-[#0F172A] placeholder-[#0F172A]/40 focus:outline-none focus:ring-2 focus:ring-[#C9B87A] focus:border-transparent transition-all text-xs font-medium"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                <label className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#0F172A]/60 mb-2">
                   Пароль (Password)
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-[#A08C4A]">
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
@@ -132,8 +159,8 @@ export default function Login({ onLoginSuccess, openEmailSimulator }: LoginProps
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+                    placeholder="••••••••••••"
+                    className="w-full pl-11 pr-4 py-3.5 bg-[#F7F5F2] border border-[#C9B87A]/40 rounded-2xl text-[#0F172A] placeholder-[#0F172A]/40 focus:outline-none focus:ring-2 focus:ring-[#C9B87A] focus:border-transparent transition-all text-xs font-medium"
                     required
                   />
                 </div>
@@ -143,67 +170,39 @@ export default function Login({ onLoginSuccess, openEmailSimulator }: LoginProps
                 id="submit-login-btn"
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 py-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-indigo-200 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer text-sm tracking-tight"
+                className="w-full mt-3 py-4 bg-[#0F172A] hover:bg-[#1E293B] active:scale-[0.99] disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2.5 transition-all cursor-pointer text-xs uppercase tracking-[0.15em] border border-[#C9B87A]/30 shadow-lg shadow-[#0F172A]/20"
               >
                 {loading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    Войти в систему
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Войти в аккаунт</span>
+                    <ArrowRight className="w-4 h-4 text-[#C9B87A]" />
                   </>
                 )}
               </button>
             </form>
           </div>
 
-          {/* Quick login helper block */}
-          <div className="border-t border-slate-100 bg-slate-50/50 p-6 space-y-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
-              Тестовые аккаунты для входа:
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <button
-                id="quick-admin-login"
-                type="button"
-                onClick={() => handleQuickSelect('admin@support.edu', 'admin123')}
-                className="p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-indigo-50/30 hover:border-indigo-500/40 text-left transition-all flex flex-col justify-between group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 group-hover:text-indigo-700">Администратор</span>
-                  <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-bold">Full Access</span>
-                </div>
-                <div className="mt-1 text-slate-500 font-mono text-[11px] truncate">admin@support.edu</div>
-                <div className="text-slate-400 mt-1 font-mono text-[10px]">Pass: admin123</div>
-              </button>
-
-              <button
-                id="quick-employee-login"
-                type="button"
-                onClick={() => handleQuickSelect('Dastan.Abitkulov@retmind.com', 'password123')}
-                className="p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-indigo-50/30 hover:border-indigo-500/40 text-left transition-all flex flex-col justify-between group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 group-hover:text-indigo-700">Dastan Abitkulov</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[9px] font-bold">Specialist L1</span>
-                </div>
-                <div className="mt-1 text-slate-500 font-mono text-[11px] truncate">Dastan.Abitkulov@retmind.com</div>
-                <div className="text-slate-400 mt-1 font-mono text-[10px]">Pass: password123</div>
-              </button>
-            </div>
-
-            <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] leading-relaxed text-indigo-700 italic border border-indigo-100/20">
-              <p className="font-bold not-italic mb-1 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-                Тестирование приглашений:
-              </p>
-              Зайдите как <strong className="text-slate-900 not-italic font-bold">Администратор</strong>, создайте нового сотрудника, и затем откройте <button type="button" onClick={openEmailSimulator} className="underline font-bold text-indigo-650 hover:text-indigo-700">Симулятор писем</button>, чтобы получить ссылку-приглашение для активации нового аккаунта!
-            </div>
+          {/* Clean Card Footer */}
+          <div className="border-t border-[#C9B87A]/20 bg-[#F7F5F2]/80 px-8 py-4 text-center">
+            <p className="text-[11px] font-medium text-[#0F172A]/60 flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#A08C4A]" />
+              <span>Стратегия · Процессы · Люди · Данные · Технологии</span>
+            </p>
           </div>
+        </motion.div>
+      </main>
+
+      {/* Retmind Footer */}
+      <footer className="w-full max-w-6xl text-center z-10 py-4 border-t border-[#C9B87A]/30 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-medium text-[#0F172A]/60">
+        <div>
+          Retmind — Международная компания в области ИТ и консалтинга для розничного бизнеса.
         </div>
-      </motion.div>
+        <div className="font-mono text-[10px]">
+          © {new Date().getFullYear()} Retmind. Все права защищены.
+        </div>
+      </footer>
     </div>
   );
 }
