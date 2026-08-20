@@ -38,7 +38,7 @@ export const TicketCategoryManager: React.FC = () => {
       const data = await res.json();
       setCategories(data);
       
-      // Auto expand all systems and modules by default
+      // Systems expanded by default, modules collapsed by default
       const initialSys: Record<string, boolean> = {};
       const initialMods: Record<string, boolean> = {};
       data.forEach((sys: any) => {
@@ -46,7 +46,7 @@ export const TicketCategoryManager: React.FC = () => {
         initialSys[sysKey] = true;
         (sys.modules || []).forEach((mod: any) => {
           const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
-          initialMods[modKey] = true;
+          initialMods[modKey] = false;
         });
       });
       setExpandedSystems(initialSys);
@@ -402,20 +402,22 @@ export const TicketCategoryManager: React.FC = () => {
                   <div className="p-5 space-y-4">
                     {(sys.modules || []).map((mod: any) => {
                       const modKey = mod.id || `${sysKey}_mod_${mod.name}`;
-                      const isModExpanded = expandedModules[modKey] ?? true;
+                      const isModExpanded = expandedModules[modKey] ?? false;
                       const isAddingType = addingTypeForModKey === modKey;
 
                       return (
                         <div key={modKey} className="bg-[#F7F5F2]/60 border border-[#C9B87A]/25 rounded-xl p-4 space-y-3">
                           {/* Module Header */}
                           <div className="flex items-center justify-between pb-2 border-b border-[#C9B87A]/20">
-                            <div className="flex items-center gap-2.5">
+                            <div 
+                              onClick={() => setExpandedModules(prev => ({ ...prev, [modKey]: !isModExpanded }))}
+                              className="flex items-center gap-2.5 cursor-pointer hover:opacity-85 select-none"
+                            >
                               <button
                                 type="button"
-                                onClick={() => setExpandedModules(prev => ({ ...prev, [modKey]: !isModExpanded }))}
                                 className="p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
                               >
-                                {isModExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                {isModExpanded ? <ChevronDown className="w-4 h-4 text-[#A08C4A]" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                               </button>
                               <Box className="w-4 h-4 text-[#A08C4A]" />
                               <span className="font-bold text-xs text-[#0F172A]">{mod.name}</span>
