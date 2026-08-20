@@ -1643,8 +1643,6 @@ async function startServer() {
         );
       })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
     }
-      })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
-    }
 
     // Create Onboarding Invitation
     const newInvitation: Invitation = {
