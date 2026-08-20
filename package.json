@@ -22,10 +22,12 @@
     "express": "^4.21.2",
     "dotenv": "^17.2.3",
     "motion": "^12.23.24",
+    "nodemailer": "^6.10.0",
     "pg": "^8.13.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.11",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",

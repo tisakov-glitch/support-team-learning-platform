@@ -15,8 +15,45 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { TICKET_CATEGORIES } from './src/ticketCategories';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
+
+// Nodemailer SMTP Transporter setup (Yandex SMTP)
+const smtpHost = process.env.SMTP_HOST || 'smtp.yandex.ru';
+const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+const smtpSecure = process.env.SMTP_SECURE !== 'false';
+const smtpUser = process.env.SMTP_USER || 'notifications@retmind.com';
+const smtpPass = process.env.SMTP_PASS || 'mkcykiprudlrctob';
+const smtpFrom = process.env.SMTP_FROM || '"Support Team Learning" <notifications@retmind.com>';
+
+const mailTransporter = nodemailer.createTransport({
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpSecure,
+  auth: {
+    user: smtpUser,
+    pass: smtpPass
+  }
+});
+
+// Helper function to send real SMTP email
+async function sendRealSmtpEmail(options: { to: string; subject: string; text: string; html?: string }) {
+  try {
+    const info = await mailTransporter.sendMail({
+      from: smtpFrom,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html || options.text.replace(/\n/g, '<br>')
+    });
+    console.log('📧 [SMTP] Real Email sent successfully to', options.to, 'Message ID:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.error('❌ [SMTP] Error sending real email to', options.to, err);
+    return { success: false, error: err.message };
+  }
+}
 
 const appFilename = typeof __filename !== 'undefined' ? __filename : process.cwd();
 const appDirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(appFilename);
@@ -1192,16 +1229,52 @@ async function startServer() {
     };
     db.invitations[token] = newInvitation;
 
-    // Simulate sending email by writing to simulated emails list
+    // Generate Invitation Link & Email Content
     const host = req.get('host') || 'localhost:3000';
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
     const invitationLink = `${protocol}://${host}/onboarding/${token}`;
-    const emailBody = `Здравствуйте, ${name}!\n\nВас зарегистрировали на обучающей платформе поддержки.\nДля настройки учетной записи, создания пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nС уважением,\nКоманда Support Team Learning`;
+    const emailSubject = 'Ваша учетная запись сотрудника поддержки готова';
+    const emailBody = `Здравствуйте, ${name}!\n\nВас зарегистрировали на обучающей платформе поддержки RetMind.\nДля настройки учетной записи, создания пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nСсылка действительна в течение 7 дней.\n\nС уважением,\nКоманда Support Team Learning`;
+
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; padding: 40px 20px; color: #f8fafc;">
+        <div style="max-width: 560px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #14b8a6; margin: 0; font-size: 24px; font-weight: 800;">Support Team Learning</h2>
+            <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">Обучающая платформа службы поддержки RetMind</p>
+          </div>
+          <h3 style="color: #ffffff; font-size: 18px; margin-bottom: 16px;">Здравствуйте, ${name}!</h3>
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            Вас успешно зарегистрировали в системе. Для настройки учетной записи, создания персонального пароля и активации аккаунта нажмите на кнопку ниже:
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invitationLink}" style="background-color: #14b8a6; color: #0f172a; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);">
+              Активировать аккаунт и создать пароль &rarr;
+            </a>
+          </div>
+          <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin-top: 24px; border-top: 1px solid #334155; padding-top: 16px;">
+            Если кнопка не нажимается, скопируйте и вставьте следующую ссылку в адресную строку браузера:<br>
+            <a href="${invitationLink}" style="color: #14b8a6; word-break: break-all;">${invitationLink}</a>
+          </p>
+          <p style="color: #475569; font-size: 11px; text-align: center; margin-top: 20px;">
+            Ссылка действительна в течение 7 дней.<br>&copy; RetMind Support Team
+          </p>
+        </div>
+      </div>
+    `;
+
+    // Dispatch real email via SMTP
+    sendRealSmtpEmail({
+      to: email,
+      subject: emailSubject,
+      text: emailBody,
+      html: emailHtml
+    }).catch(err => console.error('SMTP Background send error:', err));
 
     const newEmail: SimulatedEmail = {
       id: 'email-' + Math.random().toString(36).substr(2, 9),
       to: email,
-      subject: 'Ваша учетная запись сотрудника поддержки готова',
+      subject: emailSubject,
       body: emailBody,
       token,
       sentAt: new Date().toISOString(),
