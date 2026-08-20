@@ -30,19 +30,7 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
-export POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
-export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
-export POSTGRES_USER="${POSTGRES_USER:-talgat}"
-export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-talgat}"
-export POSTGRES_DB="${POSTGRES_DB:-onb}"
 
-echo "🗄️ Applying PostgreSQL database DDL migrations from scripts/schema.sql..."
-
-if [ -n "$DATABASE_URL" ]; then
-  psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || true
-else
-  PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null || true
-fi
 
 MODE="${1:-prod}"
 
