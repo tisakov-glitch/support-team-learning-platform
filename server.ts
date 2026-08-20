@@ -1539,14 +1539,22 @@ async function startServer() {
     const id = 'emp-' + Math.random().toString(36).substr(2, 9);
     const token = 'token-' + Math.random().toString(36).substr(2, 16);
 
+    const matchedDept = (db.departments || []).find(d => d.id === departmentId || d.name === departmentId);
+    const resolvedDeptId = matchedDept ? matchedDept.id : (departmentId || 'd1');
+    const resolvedDeptName = matchedDept ? matchedDept.name : (department || 'RetMind Support');
+
+    const matchedPos = (db.positions || []).find(p => p.code === positionCode);
+    const resolvedPosCode = matchedPos ? matchedPos.code : (positionCode || '13');
+    const resolvedPosName = matchedPos ? matchedPos.name : (positionName || 'Support Specialist');
+
     const profileObj = {
       phone: phone || '',
-      department: department || 'RetMind Support',
-      departmentId: departmentId || '',
+      department: resolvedDeptName,
+      departmentId: resolvedDeptId,
       specializations: specializations || [],
       bio: bio || '',
-      positionCode: positionCode || '13',
-      positionName: positionName || 'Support Specialist',
+      positionCode: resolvedPosCode,
+      positionName: resolvedPosName,
       rank: rank || '',
       rankId: rankId || ''
     };
@@ -1561,10 +1569,10 @@ async function startServer() {
       status: 'pending',
       createdAt: new Date().toISOString(),
       phone: phone || '',
-      departmentId: departmentId || '',
-      department: department || 'RetMind Support',
-      positionCode: positionCode || '13',
-      positionName: positionName || 'Support Specialist',
+      departmentId: resolvedDeptId,
+      department: resolvedDeptName,
+      positionCode: resolvedPosCode,
+      positionName: resolvedPosName,
       rank: rank || '',
       rankId: rankId || '',
       bio: bio || '',
@@ -1574,6 +1582,19 @@ async function startServer() {
 
     // Save user
     db.employees[id] = newEmployee;
+
+    if (pgPool) {
+      pgPool.query(
+        `INSERT INTO employees (
+           id, email, first_name, last_name, role, status, created_at,
+           phone, department_id, position_code, rank_name, bio, specializations
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          id, email, fName, lName, role || 'employee', 'pending', new Date().toISOString(),
+          phone || null, resolvedDeptId, resolvedPosCode, rank || null, bio || null, specializations || []
+        ]
+      ).catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
+    }
 
     // Create Onboarding Invitation
     const newInvitation: Invitation = {

@@ -64,6 +64,7 @@ export default function AdminDashboard({
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newPositionCode, setNewPositionCode] = useState('13'); // default: Support Specialist
+  const [newDepartmentId, setNewDepartmentId] = useState('d1');
   const [newDepartment, setNewDepartment] = useState('RetMind Support');
   const [newRole, setNewRole] = useState<UserRole>('employee');
   const [newBio, setNewBio] = useState('');
@@ -76,6 +77,7 @@ export default function AdminDashboard({
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editPositionCode, setEditPositionCode] = useState('13');
+  const [editDepartmentId, setEditDepartmentId] = useState('d1');
   const [editDepartment, setEditDepartment] = useState('RetMind Support');
   const [editRole, setEditRole] = useState<UserRole>('employee');
   const [editBio, setEditBio] = useState('');
@@ -1683,10 +1685,15 @@ export default function AdminDashboard({
     }
   };
 
-  const handleDepartmentChange = (deptName: string) => {
-    setNewDepartment(deptName);
-    const deptObj = dbDepartments.find(d => d.name === deptName);
-    const filtered = dbPositions.filter(p => p.departmentId === deptObj?.id);
+  const handleDepartmentChange = (deptId: string) => {
+    setNewDepartmentId(deptId);
+    const deptObj = dbDepartments.find(d => d.id === deptId || d.name === deptId);
+    if (deptObj) {
+      setNewDepartment(deptObj.name);
+      setNewDepartmentId(deptObj.id);
+    }
+    const targetId = deptObj?.id || deptId;
+    const filtered = dbPositions.filter(p => p.departmentId === targetId);
     if (filtered.length > 0) {
       const firstPos = filtered[0];
       setNewPositionCode(firstPos.code);
@@ -1706,10 +1713,15 @@ export default function AdminDashboard({
     }
   };
 
-  const handleEditDepartmentChange = (deptName: string) => {
-    setEditDepartment(deptName);
-    const deptObj = dbDepartments.find(d => d.name === deptName);
-    const filtered = dbPositions.filter(p => p.departmentId === deptObj?.id);
+  const handleEditDepartmentChange = (deptId: string) => {
+    setEditDepartmentId(deptId);
+    const deptObj = dbDepartments.find(d => d.id === deptId || d.name === deptId);
+    if (deptObj) {
+      setEditDepartment(deptObj.name);
+      setEditDepartmentId(deptObj.id);
+    }
+    const targetId = deptObj?.id || deptId;
+    const filtered = dbPositions.filter(p => p.departmentId === targetId);
     if (filtered.length > 0) {
       const firstPos = filtered[0];
       setEditPositionCode(firstPos.code);
@@ -2128,11 +2140,10 @@ export default function AdminDashboard({
           name: newName,
           email: newEmail,
           phone: newPhone,
-          department: newDepartment,
+          departmentId: newDepartmentId,
           bio: newBio,
           specializations,
           positionCode: newPositionCode,
-          positionName: dbPositions.find(p => p.code === newPositionCode)?.name || '',
           role: newRole,
           rank: newRank
         })
@@ -2177,13 +2188,15 @@ export default function AdminDashboard({
   const handleEditInit = (emp: Employee) => {
     setEditingEmployee(emp);
     setEditName(emp.name);
-    setEditPhone(emp.profile.phone || '');
-    setEditDepartment(emp.profile.department || '');
-    setEditBio(emp.profile.bio || '');
-    setEditSpecString(emp.profile.specializations ? emp.profile.specializations.join(', ') : '');
-    setEditPositionCode(emp.profile.positionCode || '13');
+    setEditPhone(emp.profile.phone || emp.phone || '');
+    const deptObj = dbDepartments.find(d => d.id === emp.departmentId || d.id === emp.profile?.departmentId || d.name === emp.department || d.name === emp.profile?.department);
+    setEditDepartmentId(deptObj ? deptObj.id : (emp.departmentId || 'd1'));
+    setEditDepartment(deptObj ? deptObj.name : (emp.department || 'RetMind Support'));
+    setEditBio(emp.profile.bio || emp.bio || '');
+    setEditSpecString(emp.profile.specializations ? emp.profile.specializations.join(', ') : (emp.specializations ? emp.specializations.join(', ') : ''));
+    setEditPositionCode(emp.positionCode || emp.profile.positionCode || '13');
     setEditRole(emp.role || 'employee');
-    setEditRank(emp.profile.rank || '');
+    setEditRank(emp.rank || emp.profile.rank || '');
   };
 
   const handleUpdateEmployee = async (e: React.FormEvent) => {
@@ -2200,9 +2213,6 @@ export default function AdminDashboard({
         ? editSpecString.split(',').map(s => s.trim()).filter(s => s.length > 0)
         : [];
 
-      const matchedDept = departments.find(d => d.id === editDepartment || d.name === editDepartment);
-      const departmentId = matchedDept ? matchedDept.id : editDepartment;
-
       const response = await fetch(`/api/employees/${editingEmployee.id}`, {
         method: 'PUT',
         headers: {
@@ -2212,12 +2222,10 @@ export default function AdminDashboard({
         body: JSON.stringify({
           name: editName,
           phone: editPhone,
-          department: editDepartment,
-          departmentId: departmentId,
+          departmentId: editDepartmentId,
           bio: editBio,
           specializations,
           positionCode: editPositionCode,
-          positionName: dbPositions.find(p => p.code === editPositionCode)?.name || '',
           role: editRole,
           rank: editRank
         })
@@ -3184,12 +3192,12 @@ export default function AdminDashboard({
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Подразделение *</label>
                         <select
                           id="new-employee-dept"
-                          value={newDepartment}
+                          value={newDepartmentId}
                           onChange={(e) => handleDepartmentChange(e.target.value)}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer font-medium text-slate-800"
                         >
                           {dbDepartments.map(dept => (
-                            <option key={dept.id} value={dept.name}>
+                            <option key={dept.id} value={dept.id}>
                               {dept.name}
                             </option>
                           ))}
@@ -3204,10 +3212,7 @@ export default function AdminDashboard({
                           onChange={(e) => handlePositionChange(e.target.value)}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer font-medium text-slate-800"
                         >
-                          {dbPositions.filter(pos => {
-                            const currentDept = dbDepartments.find(d => d.name === newDepartment);
-                            return pos.departmentId === currentDept?.id;
-                          }).map(pos => (
+                          {dbPositions.filter(pos => pos.departmentId === newDepartmentId).map(pos => (
                             <option key={pos.code} value={pos.code}>
                               [{pos.code}] {pos.name}
                             </option>
@@ -7658,12 +7663,12 @@ export default function AdminDashboard({
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1">Подразделение *</label>
                       <select
-                        value={editDepartment}
+                        value={editDepartmentId}
                         onChange={(e) => handleEditDepartmentChange(e.target.value)}
                         className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm bg-white cursor-pointer font-medium text-slate-800"
                       >
                         {dbDepartments.map(dept => (
-                          <option key={dept.id} value={dept.name}>
+                          <option key={dept.id} value={dept.id}>
                             {dept.name}
                           </option>
                         ))}
@@ -7676,10 +7681,7 @@ export default function AdminDashboard({
                         onChange={(e) => handleEditPositionChange(e.target.value)}
                         className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm bg-white cursor-pointer font-medium text-slate-800"
                       >
-                        {dbPositions.filter(pos => {
-                          const currentDept = dbDepartments.find(d => d.name === editDepartment);
-                          return pos.departmentId === currentDept?.id;
-                        }).map(pos => (
+                        {dbPositions.filter(pos => pos.departmentId === editDepartmentId).map(pos => (
                           <option key={pos.code} value={pos.code}>
                             [{pos.code}] {pos.name}
                           </option>
