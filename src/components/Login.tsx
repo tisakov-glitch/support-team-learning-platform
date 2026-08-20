@@ -61,28 +61,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       {/* Top Header Navigation Bar */}
       <header className="w-full max-w-6xl flex items-center justify-between z-10 py-4 border-b border-[#C9B87A]/30">
         <div className="flex items-center gap-3">
-          {/* Retmind SVG Logo Lockup */}
-          <div className="flex items-center gap-2.5">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-              <rect x="2" y="2" width="32" height="32" rx="6" fill="#0F172A" />
-              <path d="M12 10H24V14H12V10Z" fill="#C9B87A" />
-              <path d="M12 16H24V20H12V16Z" fill="#E1DEDB" fillOpacity="0.8" />
-              <path d="M12 22H18V26H12V22Z" fill="#C9B87A" />
-              <circle cx="23" cy="24" r="2" fill="#C9B87A" />
-            </svg>
-            <div>
-              <span className="text-lg font-black uppercase tracking-[0.2em] text-[#0F172A] block leading-none">
-                RETMIND
-              </span>
-              <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#A08C4A] block mt-0.5">
-                Senior IT & Retail Solutions
-              </span>
-            </div>
-          </div>
+          {/* Retmind Official Logo Image */}
+          <a href="https://retmind.pro/ru" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img 
+              src="/retmind-logo.png" 
+              alt="Retmind — senior IT & retail solutions" 
+              className="h-9 md:h-11 w-auto object-contain"
+            />
+          </a>
         </div>
 
         <div className="hidden sm:flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#0F172A]/70">
-          <span className="flex items-center gap-1.5 bg-[#F5EFD7] px-3 py-1.5 rounded-full border border-[#C9B87A]/40 text-[#0F172A]">
+          <span className="flex items-center gap-1.5 bg-[#F5EFD7] px-3.5 py-1.5 rounded-full border border-[#C9B87A]/40 text-[#0F172A]">
             <Globe className="w-3.5 h-3.5 text-[#A08C4A]" />
             <span>Support & Learning Academy</span>
           </span>
@@ -103,10 +93,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="p-8 sm:p-10">
             {/* Header Title inside card */}
             <div className="text-center mb-8">
-              <div className="inline-flex p-3 rounded-2xl bg-[#F5EFD7] text-[#0F172A] mb-3 border border-[#C9B87A]/40 shadow-xs">
-                <ShieldCheck className="w-6 h-6 text-[#A08C4A]" />
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="/retmind-logo.png" 
+                  alt="Retmind" 
+                  className="h-12 w-auto object-contain px-3 py-1.5 bg-[#F7F5F2] rounded-xl border border-[#C9B87A]/30"
+                />
               </div>
-              <h1 className="text-xl font-bold uppercase tracking-[0.12em] text-[#0F172A]">
+              <h1 className="text-lg font-bold uppercase tracking-[0.14em] text-[#0F172A]">
                 Вход в систему
               </h1>
               <p className="text-xs text-[#0F172A]/60 mt-1.5 tracking-wide">
