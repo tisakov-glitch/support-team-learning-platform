@@ -26,12 +26,19 @@ CREATE TABLE IF NOT EXISTS positions (
 -- 4. Ranks Table
 CREATE TABLE IF NOT EXISTS ranks (
     id VARCHAR(64) PRIMARY KEY,
-    position_code VARCHAR(64) NOT NULL REFERENCES positions(code) ON DELETE CASCADE,
+    position_code VARCHAR(64) REFERENCES positions(code) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE ranks ALTER COLUMN position_code DROP NOT NULL;
 GRANT ALL ON TABLE ranks TO PUBLIC;
+
+INSERT INTO ranks (id, position_code, name, sort_order)
+VALUES 
+  ('no-rank', NULL, 'Без ранга', 0),
+  ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 -- 4. Employees Table (Normalized)
 CREATE TABLE IF NOT EXISTS employees (
@@ -46,6 +53,7 @@ CREATE TABLE IF NOT EXISTS employees (
     phone VARCHAR(64),
     department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
     position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL,
+    rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL,
     course_started_dates JSONB DEFAULT '{}'::jsonb
 );
 
@@ -55,11 +63,32 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT ''
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;
 ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;
-ALTER TABLE employees DROP COLUMN IF EXISTS rank_id CASCADE;
+
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
+    ) THEN
+        ALTER TABLE employees 
+        ADD CONSTRAINT fk_employees_rank_id 
+        FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
+    END IF;
+EXCEPTION WHEN OTHERS THEN END $$;
+
+-- Update non-admin employees to role = 'employee', department_id = 'dept-5', position_code = '12', rank_id = '12-shift-manager-l1'
+UPDATE employees 
+SET 
+  role = 'employee',
+  department_id = 'dept-5',
+  position_code = '12',
+  rank_id = '12-shift-manager-l1'
+WHERE role != 'admin';
 
 -- Populate first_name, last_name, rank_id and normalize profile JSONB
 DO $$ 

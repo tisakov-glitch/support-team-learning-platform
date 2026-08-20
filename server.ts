@@ -874,13 +874,41 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;`); } catch (e) {}
 
   try {
-    const checkRankName = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='rank_name'`);
-    if (checkRankName.rowCount && checkRankName.rowCount > 0) {
-      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;`);
-    }
-    await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS rank_id CASCADE;`);
+    await client.query(`
+      ALTER TABLE ranks ALTER COLUMN position_code DROP NOT NULL;
+      GRANT ALL ON TABLE ranks TO PUBLIC;
+
+      INSERT INTO ranks (id, position_code, name, sort_order)
+      VALUES 
+        ('no-rank', NULL, 'Без ранга', 0),
+        ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
+
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (
+              SELECT 1 FROM information_schema.table_constraints 
+              WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
+          ) THEN
+              ALTER TABLE employees 
+              ADD CONSTRAINT fk_employees_rank_id 
+              FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
+          END IF;
+      EXCEPTION WHEN OTHERS THEN END $$;
+
+      UPDATE employees 
+      SET 
+        role = 'employee',
+        department_id = 'dept-5',
+        position_code = '12',
+        rank_id = '12-shift-manager-l1'
+      WHERE role != 'admin';
+    `);
+    console.log('✅ Updated non-admin employees: role=employee, dept=dept-5, pos=12, rank=12-shift-manager-l1');
   } catch (e: any) {
-    console.warn('Notice dropping rank_id/rank_name column:', e.message);
+    console.warn('Notice ensuring employees table normalization:', e.message);
   }
 }
 
@@ -935,17 +963,34 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
     }
 
     let employeesRows: any[] = [];
-    employeesRows = (await client.query(`
-      SELECT 
-        e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
-        e.role, e.status, e.created_at as "createdAt", e.password,
-        e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-        e.course_started_dates as "courseStartedDates",
-        d.name as "departmentName", p.name as "positionName"
-      FROM employees e
-      LEFT JOIN departments d ON e.department_id = d.id
-      LEFT JOIN positions p ON e.position_code = p.code
-    `)).rows;
+    try {
+      employeesRows = (await client.query(`
+        SELECT 
+          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+          e.role, e.status, e.created_at as "createdAt", e.password,
+          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+          e.rank_id as "rankId", COALESCE(r.name, 'Без ранга') as "rankName",
+          e.course_started_dates as "courseStartedDates",
+          d.name as "departmentName", p.name as "positionName"
+        FROM employees e
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_code = p.code
+        LEFT JOIN ranks r ON e.rank_id = r.id
+      `)).rows;
+    } catch (e) {
+      employeesRows = (await client.query(`
+        SELECT 
+          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+          e.role, e.status, e.created_at as "createdAt", e.password,
+          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+          'no-rank' as "rankId", 'Без ранга' as "rankName",
+          e.course_started_dates as "courseStartedDates",
+          d.name as "departmentName", p.name as "positionName"
+        FROM employees e
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_code = p.code
+      `)).rows;
+    }
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
     const courses = (await client.query('SELECT id, title, description, position_code as "positionCode", position_name as "positionName", rank, bindings, lessons, created_at as "createdAt", study_duration_days as "studyDurationDays", exam_duration_days as "examDurationDays" FROM courses')).rows;
@@ -1573,16 +1618,31 @@ async function startServer() {
     // Save user
     db.employees[id] = newEmployee;
 
+    if (pgPool) {
+      (async () => {
+        let finalRankId = rankId;
+        if (!finalRankId && rank) {
+          try {
+            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rank, resolvedPosCode]);
+            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+          } catch (e) {}
+        }
+        if (!finalRankId) {
+          finalRankId = 'no-rank';
+        }
+
         await pgPool!.query(
           `INSERT INTO employees (
              id, email, first_name, last_name, role, status, created_at,
-             phone, department_id, position_code
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+             phone, department_id, position_code, rank_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             id, email, fName, lName, role || 'employee', 'pending', new Date().toISOString(),
-            phone || null, resolvedDeptId, resolvedPosCode
+            phone || null, resolvedDeptId, resolvedPosCode, finalRankId
           ]
         );
+      })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
+    }
       })().catch(err => console.error('Error inserting new employee into PostgreSQL:', err));
     }
 
@@ -1760,6 +1820,23 @@ async function startServer() {
           } catch (e) {}
         }
 
+        let finalRankId = resolvedRankId;
+        if (!finalRankId && targetRankVal) {
+          try {
+            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, targetEmployee.positionCode || null]);
+            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+          } catch (e) {}
+        }
+        if (!finalRankId) {
+          // Check if position has ranks
+          try {
+            const posRanks = await pgPool!.query('SELECT id FROM ranks WHERE position_code = $1 LIMIT 1', [targetEmployee.positionCode || '']);
+            if (posRanks.rows.length === 0) {
+              finalRankId = 'no-rank';
+            }
+          } catch (e) {}
+        }
+
         await pgPool!.query(
           `UPDATE employees SET
              first_name = $1,
@@ -1768,8 +1845,9 @@ async function startServer() {
              role = $4,
              phone = $5,
              department_id = $6,
-             position_code = $7
-           WHERE id = $8`,
+             position_code = $7,
+             rank_id = $8
+           WHERE id = $9`,
           [
             targetEmployee.firstName || '',
             targetEmployee.lastName || '',
@@ -1778,6 +1856,7 @@ async function startServer() {
             targetEmployee.phone || null,
             finalDeptId || null,
             targetEmployee.positionCode || null,
+            finalRankId || null,
             id
           ]
         );
