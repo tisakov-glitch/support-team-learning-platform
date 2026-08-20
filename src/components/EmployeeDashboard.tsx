@@ -862,7 +862,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   const coursesProgressPercent = totalLessonsCount > 0 
     ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
     : 0;
-  const initials = profile.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  const initials = (profile?.name || profile?.email || 'EM').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
     <div id="employee-dashboard-container" className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">

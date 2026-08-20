@@ -2156,7 +2156,8 @@ export default function AdminDashboard({
       }
 
       // Add to list, reset form, show success message
-      setEmployees(prev => [...prev, data.employee]);
+      const createdEmp = data.employee || data;
+      setEmployees(prev => [...prev.filter(e => e.id !== createdEmp.id), createdEmp]);
       setSuccessMsg(`Сотрудник ${newName} успешно зарегистрирован. На его email отправлено приглашение!`);
       
       // Reset registration form
@@ -2228,7 +2229,8 @@ export default function AdminDashboard({
       }
 
       // Update in UI list
-      setEmployees(prev => prev.map(emp => emp.id === data.id ? data : emp));
+      const updatedEmp = data.employee || data;
+      setEmployees(prev => prev.map(emp => emp.id === (updatedEmp.id || editingEmployee.id) ? { ...emp, ...updatedEmp } : emp));
       setSuccessMsg(`Профиль сотрудника ${editName} успешно обновлен!`);
       setEditingEmployee(null);
     } catch (err: any) {
@@ -2425,7 +2427,7 @@ export default function AdminDashboard({
           <div className="flex items-center justify-between gap-2 p-2 bg-slate-900/60 rounded-xl border border-slate-900/55">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm shadow-indigo-500/20">
-                {adminUser.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
+                {(adminUser?.name || adminUser?.email || 'AD').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0,2).toUpperCase()}
               </div>
               <div className="overflow-hidden">
                 <div className="text-[10px] font-extrabold text-white truncate leading-snug">{adminUser.name}</div>
@@ -2599,7 +2601,7 @@ export default function AdminDashboard({
                 <div className="p-4 border-t border-slate-150 space-y-3">
                   <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
                     <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center font-bold text-xs shrink-0">
-                      {adminUser.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
+                      {(adminUser?.name || adminUser?.email || 'AD').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0,2).toUpperCase()}
                     </div>
                     <div className="overflow-hidden">
                       <div className="text-[10px] font-bold text-slate-800 truncate">{adminUser.name}</div>
@@ -3396,7 +3398,7 @@ export default function AdminDashboard({
                     </div>
                   ) : (
                     filteredAndSortedEmployees.map((emp) => {
-                      const initials = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                      const initials = (emp?.name || emp?.email || 'EM').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
                       const isSelected = emp.id === selectedEmployeeId;
                       const isPending = emp.status === 'pending';
 
@@ -3477,7 +3479,7 @@ export default function AdminDashboard({
                     );
                   }
 
-                  const initials = selectedEmp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                  const initials = (selectedEmp?.name || selectedEmp?.email || 'EM').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
                   const isPending = selectedEmp.status === 'pending';
                   const selPosCode = selectedEmp.positionCode || selectedEmp.profile?.positionCode;
                   const selRank = selectedEmp.rank || selectedEmp.profile?.rank;

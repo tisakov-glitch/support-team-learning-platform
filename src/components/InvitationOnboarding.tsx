@@ -157,7 +157,7 @@ export default function InvitationOnboarding({ token, onOnboardingComplete, onCa
             {employee && (
               <div className="bg-slate-900/50 border border-slate-700/50 p-4 rounded-xl flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold font-mono">
-                  {employee.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
+                  {(employee?.name || employee?.email || 'EM').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0,2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-bold text-white text-sm truncate">{employee.name}</h3>
