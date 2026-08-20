@@ -43,7 +43,7 @@ else
   npm run build
 
   echo "🚀 Starting app on Port 3000 in background..."
-  nohup env PORT=3000 npm start > app.log 2>&1 &
+  nohup env PORT=3000 NODE_ENV=production npm start > app.log 2>&1 &
   echo "✅ App running in background (PID: $!). View logs with: tail -f app.log"
 fi
 
