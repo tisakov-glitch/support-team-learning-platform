@@ -3269,28 +3269,6 @@ export default function AdminDashboard({
                       })()}
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Специализации (через запятую)</label>
-                      <input
-                        id="new-employee-specs"
-                        type="text"
-                        value={newSpecString}
-                        onChange={(e) => setNewSpecString(e.target.value)}
-                        placeholder="Linux, Биллинг, SQL, API, Гарантия"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Краткая информация / Биография</label>
-                      <textarea
-                        id="new-employee-bio"
-                        value={newBio}
-                        onChange={(e) => setNewBio(e.target.value)}
-                        placeholder="Напишите кратко о квалификации или роли нового сотрудника..."
-                        rows={2}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
@@ -7733,25 +7711,6 @@ export default function AdminDashboard({
                     return null;
                   })()}
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Специализации (через запятую)</label>
-                    <input
-                      type="text"
-                      value={editSpecString}
-                      onChange={(e) => setEditSpecString(e.target.value)}
-                      className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                      placeholder="Linux, CRM, API"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Краткая информация / Описание</label>
-                    <textarea
-                      value={editBio}
-                      onChange={(e) => setEditBio(e.target.value)}
-                      rows={3}
-                      className="w-full px-3.5 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                    />
                   </div>
                 </div>
 
