@@ -30,13 +30,22 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
+export POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+export POSTGRES_USER="${POSTGRES_USER:-talgat}"
+export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-talgat}"
+export POSTGRES_DB="${POSTGRES_DB:-onb}"
+
 echo "🗄️ Applying PostgreSQL database DDL migrations (rank_id FK & profile normalization)..."
 
 run_psql() {
   if [ -n "$DATABASE_URL" ]; then
-    psql "$DATABASE_URL" -c "$1" 2>/dev/null || psql -U postgres -d support_db -c "$1" 2>/dev/null || true
+    psql "$DATABASE_URL" -c "$1" 2>/dev/null || PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1" 2>/dev/null || psql -U postgres -d support_db -c "$1" 2>/dev/null || true
   else
-    psql -U postgres -d support_db -c "$1" 2>/dev/null || true
+    PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1" 2>/dev/null \
+    || psql -U postgres -d support_db -c "$1" 2>/dev/null \
+    || psql -U postgres -d postgres -c "$1" 2>/dev/null \
+    || true
   fi
 }
 
@@ -56,9 +65,12 @@ run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;"
 
 if [ -n "$DATABASE_URL" ]; then
-  psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
+  psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
 else
-  psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
+  PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null \
+  || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null \
+  || psql -U postgres -d postgres -f scripts/schema.sql 2>/dev/null \
+  || true
 fi
 
 MODE="${1:-prod}"

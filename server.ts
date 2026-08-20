@@ -799,19 +799,18 @@ function writeDB(data: LocalDatabase) {
 }
 
 let pgPool: pg.Pool | null = null;
-if (process.env.POSTGRES_HOST || process.env.DATABASE_URL) {
-  const poolConfig = process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL }
-    : {
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
       host: process.env.POSTGRES_HOST || 'localhost',
       port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
       user: process.env.POSTGRES_USER || 'talgat',
       password: process.env.POSTGRES_PASSWORD || 'talgat',
       database: process.env.POSTGRES_DB || 'onb'
     };
-  pgPool = new pg.Pool(poolConfig);
-  pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
-}
+
+pgPool = new pg.Pool(poolConfig);
+pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
 
 async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   console.log('🔄 Running PostgreSQL employees table normalization...');
