@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket as TicketIcon, X, AlertCircle, Check, Paperclip, Trash2 } from 'lucide-react';
 import { VoiceTicketRecorder } from './VoiceTicketRecorder';
 import { ImageTicketAnalyzer } from './ImageTicketAnalyzer';
