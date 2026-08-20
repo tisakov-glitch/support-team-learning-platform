@@ -721,7 +721,7 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       }
     }
 
-    // Ensure support_client_countries junction table exists
+    // Ensure support_client_countries junction table exists and legacy countries column is dropped
     try {
       await client.query(`
         CREATE TABLE IF NOT EXISTS support_client_countries (
@@ -730,6 +730,7 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
             PRIMARY KEY (client_id, country_id)
         );
       `);
+      await client.query(`ALTER TABLE support_clients DROP COLUMN IF EXISTS countries;`);
     } catch (e) {}
 
     let supportClients: SupportClient[] = [];

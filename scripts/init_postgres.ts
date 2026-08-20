@@ -413,6 +413,7 @@ async function runMigration() {
             PRIMARY KEY (client_id, country_id)
         );
       `);
+      await client.query(`ALTER TABLE support_clients DROP COLUMN IF EXISTS countries;`);
     } catch (err) {}
 
     if (Array.isArray(data.supportClients)) {
