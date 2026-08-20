@@ -3433,10 +3433,10 @@ export default function AdminDashboard({
                               )}
                             </h4>
                             <p className="text-[10px] text-indigo-600 font-semibold truncate leading-tight">
-                              {emp.profile.positionName || 'Специалист'}
+                              {emp.positionName || emp.profile?.positionName || 'Специалист'}
                             </p>
                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider truncate">
-                              {emp.profile.department || 'RetMind Support'}
+                              {emp.department || emp.profile?.department || 'RetMind Support'}
                             </p>
                           </div>
 
@@ -3479,16 +3479,21 @@ export default function AdminDashboard({
 
                   const initials = selectedEmp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                   const isPending = selectedEmp.status === 'pending';
+                  const selPosCode = selectedEmp.positionCode || selectedEmp.profile?.positionCode;
+                  const selRank = selectedEmp.rank || selectedEmp.profile?.rank;
+                  const selPosName = selectedEmp.positionName || selectedEmp.profile?.positionName || 'Специалист';
+                  const selDept = selectedEmp.department || selectedEmp.profile?.department || 'RetMind Support';
+                  const selPhone = selectedEmp.phone || selectedEmp.profile?.phone;
                   
                   // Compute Assigned Courses
                   const empCourses = courses.filter(course => {
-                    if (course.positionCode === selectedEmp.profile.positionCode) {
-                      if (!course.rank || course.rank === selectedEmp.profile.rank) return true;
+                    if (course.positionCode === selPosCode) {
+                      if (!course.rank || course.rank === selRank) return true;
                     }
                     if (course.bindings && course.bindings.length > 0) {
                       return course.bindings.some(b => 
-                        b.positionCode === selectedEmp.profile.positionCode && 
-                        (!b.rank || b.rank === selectedEmp.profile.rank)
+                        b.positionCode === selPosCode && 
+                        (!b.rank || b.rank === selRank)
                       );
                     }
                     return false;
@@ -3533,16 +3538,16 @@ export default function AdminDashboard({
                             </div>
 
                             <p className="text-xs font-semibold text-indigo-600 flex items-center flex-wrap gap-1 leading-none">
-                              <span>{selectedEmp.profile.positionName || 'Специалист'} ({selectedEmp.profile.positionCode || '—'})</span>
-                              {selectedEmp.profile.rank && (
+                              <span>{selPosName} ({selPosCode || '—'})</span>
+                              {selRank && (
                                 <span className="px-1.5 py-0.2 bg-teal-50 text-teal-700 rounded border border-teal-150 text-[9px] font-bold leading-none">
-                                  {selectedEmp.profile.rank}
+                                  {selRank}
                                 </span>
                               )}
                             </p>
 
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none pt-0.5">
-                              {selectedEmp.profile.department || 'Без отдела'}
+                              {selDept}
                             </p>
                           </div>
                         </div>
@@ -3600,10 +3605,10 @@ export default function AdminDashboard({
                               <span className="font-mono text-slate-700">{selectedEmp.email}</span>
                             </div>
 
-                            {selectedEmp.profile.phone && (
+                            {selPhone && (
                               <div className="flex items-center gap-2.5">
                                 <Phone className="w-4 h-4 text-slate-400" />
-                                <span className="font-mono text-slate-700">{selectedEmp.profile.phone}</span>
+                                <span className="font-mono text-slate-700">{selPhone}</span>
                               </div>
                             )}
 
@@ -3632,7 +3637,7 @@ export default function AdminDashboard({
                               <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                               <p className="text-xs font-bold text-slate-500">Курсы не назначены</p>
                               <p className="text-[10px] text-slate-400 mt-1">
-                                Нет активных курсов для должности "{selectedEmp.profile.positionName || 'Специалист'}" с рангом "{selectedEmp.profile.rank || '—'}".
+                                Нет активных курсов для должности "{selPosName}" с рангом "{selRank || '—'}".
                               </p>
                             </div>
                           ) : (

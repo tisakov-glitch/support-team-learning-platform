@@ -163,9 +163,9 @@ export default function InvitationOnboarding({ token, onOnboardingComplete, onCa
                   <h3 className="font-bold text-white text-sm truncate">{employee.name}</h3>
                   <p className="text-slate-400 text-[11px] truncate">{employee.email}</p>
                   <p className="text-[10px] text-teal-400 font-medium mt-0.5">
-                    {employee.profile.positionName ? `${employee.profile.positionName} ${employee.profile.rank ? `(${employee.profile.rank})` : ''}` : 'Служба поддержки'}
+                    {(employee.positionName || employee.profile?.positionName) ? `${employee.positionName || employee.profile?.positionName} ${(employee.rank || employee.profile?.rank) ? `(${employee.rank || employee.profile?.rank})` : ''}` : 'Служба поддержки'}
                   </p>
-                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">{employee.profile.department || 'Поддержка'}</p>
+                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">{employee.department || employee.profile?.department || 'Поддержка'}</p>
                 </div>
               </div>
             )}

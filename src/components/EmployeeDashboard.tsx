@@ -27,7 +27,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   const [editMode, setEditMode] = useState(false);
   
   // Editable form fields
-  const [phone, setPhone] = useState(employee.profile.phone || '');
+  const [phone, setPhone] = useState(employee.phone || employee.profile?.phone || '');
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -881,7 +881,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             <div className="flex items-center gap-2.5">
               <div className="text-right">
                 <div className="text-xs font-bold text-white leading-tight">{profile.name}</div>
-                <div className="text-[10px] text-[#C9B87A] font-mono">{profile.profile.department || 'Служба поддержки'}</div>
+                <div className="text-[10px] text-[#C9B87A] font-mono">{profile.department || profile.profile?.department || 'Служба поддержки'}</div>
               </div>
               <div className="w-8 h-8 rounded-full bg-[#F5EFD7] text-[#0F172A] border border-[#C9B87A]/40 flex items-center justify-center font-mono text-xs font-bold shrink-0">
                 {initials}
@@ -942,17 +942,17 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                 {initials}
               </div>
               <h2 className="font-bold text-lg text-slate-900 leading-snug">{profile.name}</h2>
-              {profile.profile.positionName && (
+              {(profile.positionName || profile.profile?.positionName) && (
                 <p className="text-xs font-semibold text-indigo-600 mt-1 flex items-center justify-center gap-1.5 flex-wrap">
-                  <span>{profile.profile.positionName}</span>
-                  {profile.profile.rank && (
+                  <span>{profile.positionName || profile.profile?.positionName}</span>
+                  {(profile.rank || profile.profile?.rank) && (
                     <span className="px-1.5 py-0.2 bg-teal-50 text-teal-700 rounded border border-teal-150 text-[9px] font-bold">
-                      {profile.profile.rank}
+                      {profile.rank || profile.profile?.rank}
                     </span>
                   )}
                 </p>
               )}
-              <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider text-[10px] font-bold">{profile.profile.department || 'Инженер поддержки'}</p>
+              <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider text-[10px] font-bold">{profile.department || profile.profile?.department || 'Инженер поддержки'}</p>
               <p className="text-xs text-teal-650 font-mono mt-2 bg-teal-50/50 px-2.5 py-0.5 rounded-full inline-block border border-teal-100/30">Аккаунт активен</p>
             </div>
 
@@ -979,7 +979,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                 <div>
                   <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Телефон связи</span>
                   <span className="text-slate-800 font-mono">
-                    {profile.profile.phone || <em className="text-slate-400">не указан</em>}
+                    {profile.phone || profile.profile?.phone || <em className="text-slate-400">не указан</em>}
                   </span>
                 </div>
 
@@ -1020,7 +1020,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                   <button
                     type="button"
                     onClick={() => {
-                      setPhone(profile.profile.phone || '');
+                      setPhone(profile.phone || profile.profile?.phone || '');
                       setEditMode(false);
                     }}
                     className="flex-1 py-1.5 border hover:bg-slate-50 text-xs font-semibold rounded-lg text-slate-600"

@@ -180,16 +180,14 @@ async function runMigration() {
         const posCode = emp.positionCode || emp.profile?.positionCode || null;
         const rankName = emp.rank || emp.profile?.rank || null;
         const rankId = emp.rankId || emp.profile?.rankId || null;
-        const bio = emp.bio || emp.profile?.bio || null;
-        const specs = emp.specializations || emp.profile?.specializations || [];
         const courseStarts = JSON.stringify(emp.courseStartedDates || emp.profile?.courseStartedDates || {});
 
         await client.query(
           `INSERT INTO employees (
              id, email, first_name, last_name, role, status, created_at, password,
-             phone, department_id, position_code, rank_id, rank_name, bio, specializations, course_started_dates
+             phone, department_id, position_code, rank_id, course_started_dates
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT (id) DO UPDATE SET
              email = EXCLUDED.email,
              first_name = EXCLUDED.first_name,
@@ -202,9 +200,6 @@ async function runMigration() {
              department_id = EXCLUDED.department_id,
              position_code = EXCLUDED.position_code,
              rank_id = EXCLUDED.rank_id,
-             rank_name = EXCLUDED.rank_name,
-             bio = EXCLUDED.bio,
-             specializations = EXCLUDED.specializations,
              course_started_dates = EXCLUDED.course_started_dates`,
           [
             emp.id,
@@ -219,9 +214,6 @@ async function runMigration() {
             deptId,
             posCode,
             rankId,
-            rankName,
-            bio,
-            specs,
             courseStarts
           ]
         );
