@@ -926,6 +926,17 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
       }
       console.log('✅ Synchronized fallback data from local memory state to employees table');
     }
+
+    // 6. Ensure rank_id is populated for any employee where rank_id is still NULL
+    await client.query(`
+      UPDATE employees e SET rank_id = r.id
+      FROM ranks r
+      WHERE e.rank_id IS NULL AND r.position_code = e.position_code;
+
+      UPDATE employees SET rank_id = (SELECT id FROM ranks LIMIT 1)
+      WHERE rank_id IS NULL AND (SELECT COUNT(*) FROM ranks) > 0;
+    `);
+    console.log('✅ Auto-populated non-null rank_id for all employees in PostgreSQL');
   } catch (e: any) {
     console.warn('Notice synchronizing fallback employee state:', e.message);
   }
@@ -1790,12 +1801,20 @@ async function startServer() {
         }
 
         let finalRankId = resolvedRankId;
-        if (!finalRankId && targetRankVal) {
-          try {
+        try {
+          if (!finalRankId && targetRankVal) {
             const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, targetEmployee.positionCode || null]);
             if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
-          } catch (e) {}
-        }
+          }
+          if (!finalRankId && targetEmployee.positionCode) {
+            const rRes2 = await pgPool!.query('SELECT id FROM ranks WHERE position_code = $1 LIMIT 1', [targetEmployee.positionCode]);
+            if (rRes2.rows[0]) finalRankId = rRes2.rows[0].id;
+          }
+          if (!finalRankId) {
+            const rRes3 = await pgPool!.query('SELECT id FROM ranks LIMIT 1');
+            if (rRes3.rows[0]) finalRankId = rRes3.rows[0].id;
+          }
+        } catch (e) {}
 
         await pgPool!.query(
           `UPDATE employees SET

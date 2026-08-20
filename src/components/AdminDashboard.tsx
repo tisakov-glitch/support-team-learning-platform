@@ -243,15 +243,17 @@ export default function AdminDashboard({
       if (emp.status === 'pending') return;
 
       // Filter courses assigned to this employee's position and rank
+      const posCode = emp.positionCode || emp.profile?.positionCode;
+      const rankVal = emp.rank || emp.profile?.rank;
       const assigned = courses.filter(c => {
         if (c.bindings && c.bindings.length > 0) {
-          return c.bindings.some(b => b.positionCode === emp.profile.positionCode && (!b.rank || b.rank === emp.profile.rank));
+          return c.bindings.some(b => b.positionCode === posCode && (!b.rank || b.rank === rankVal));
         }
-        return c.positionCode === emp.profile.positionCode && (!c.rank || c.rank === emp.profile.rank);
+        return c.positionCode === posCode && (!c.rank || c.rank === rankVal);
       });
 
       assigned.forEach(course => {
-        const starts = emp.profile.courseStartedDates || {};
+        const starts = emp.courseStartedDates || emp.profile?.courseStartedDates || {};
         const startedAt = starts[course.id];
         if (!startedAt) return; // Not started yet
 
@@ -372,14 +374,18 @@ export default function AdminDashboard({
     return employees
       .filter((emp) => {
         const query = employeeSearchQuery.toLowerCase().trim();
+        const empPhone = emp.phone || emp.profile?.phone || '';
+        const empPosName = emp.positionName || emp.profile?.positionName || '';
+        const empDept = emp.department || emp.profile?.department || '';
+
         const matchesSearch = !query || 
           emp.name.toLowerCase().includes(query) || 
           emp.email.toLowerCase().includes(query) || 
-          (emp.profile.phone && emp.profile.phone.toLowerCase().includes(query)) ||
-          (emp.profile.positionName && emp.profile.positionName.toLowerCase().includes(query)) ||
-          (emp.profile.department && emp.profile.department.toLowerCase().includes(query));
+          (empPhone && empPhone.toLowerCase().includes(query)) ||
+          (empPosName && empPosName.toLowerCase().includes(query)) ||
+          (empDept && empDept.toLowerCase().includes(query));
         
-        const matchesDept = employeeFilterDepartment === 'all' || emp.profile.department === employeeFilterDepartment;
+        const matchesDept = employeeFilterDepartment === 'all' || empDept === employeeFilterDepartment;
         const matchesStatus = employeeFilterStatus === 'all' || emp.status === employeeFilterStatus;
         
         return matchesSearch && matchesDept && matchesStatus;
@@ -432,13 +438,17 @@ export default function AdminDashboard({
         if (emp.status === 'pending') return false;
         
         const query = attestationSearchQuery.toLowerCase().trim();
+        const empPosName = emp.positionName || emp.profile?.positionName || '';
+        const empDept = emp.department || emp.profile?.department || '';
+        const empPosCode = emp.positionCode || emp.profile?.positionCode || '';
+
         const matchesSearch = !query || 
           emp.name.toLowerCase().includes(query) || 
           emp.email.toLowerCase().includes(query) || 
-          (emp.profile.positionName && emp.profile.positionName.toLowerCase().includes(query)) ||
-          (emp.profile.department && emp.profile.department.toLowerCase().includes(query));
+          (empPosName && empPosName.toLowerCase().includes(query)) ||
+          (empDept && empDept.toLowerCase().includes(query));
         
-        const matchesPosition = attestationFilterPosition === 'all' || emp.profile.positionCode === attestationFilterPosition;
+        const matchesPosition = attestationFilterPosition === 'all' || empPosCode === attestationFilterPosition;
         
         return matchesSearch && matchesPosition;
       })
@@ -452,11 +462,13 @@ export default function AdminDashboard({
         setAttestationEmployeeId(firstEmp.id);
         
         // Auto-select recommended course
+        const firstPosCode = firstEmp.positionCode || firstEmp.profile?.positionCode;
+        const firstRank = firstEmp.rank || firstEmp.profile?.rank;
         const assigned = courses.filter(c => {
           if (c.bindings && c.bindings.length > 0) {
-            return c.bindings.some(b => b.positionCode === firstEmp.profile.positionCode && (!b.rank || b.rank === firstEmp.profile.rank));
+            return c.bindings.some(b => b.positionCode === firstPosCode && (!b.rank || b.rank === firstRank));
           }
-          return c.positionCode === firstEmp.profile.positionCode && (!c.rank || c.rank === firstEmp.profile.rank);
+          return c.positionCode === firstPosCode && (!c.rank || c.rank === firstRank);
         });
         
         if (assigned.length > 0) {
@@ -2175,13 +2187,13 @@ export default function AdminDashboard({
   const handleEditInit = (emp: Employee) => {
     setEditingEmployee(emp);
     setEditName(emp.name);
-    setEditPhone(emp.profile.phone || emp.phone || '');
+    setEditPhone(emp.phone || emp.profile?.phone || '');
     const deptObj = dbDepartments.find(d => d.id === emp.departmentId || d.id === emp.profile?.departmentId || d.name === emp.department || d.name === emp.profile?.department);
     setEditDepartmentId(deptObj ? deptObj.id : (emp.departmentId || 'd1'));
     setEditDepartment(deptObj ? deptObj.name : (emp.department || 'RetMind Support'));
-    setEditPositionCode(emp.positionCode || emp.profile.positionCode || '13');
+    setEditPositionCode(emp.positionCode || emp.profile?.positionCode || '13');
     setEditRole(emp.role || 'employee');
-    setEditRank(emp.rank || emp.profile.rank || '');
+    setEditRank(emp.rank || emp.profile?.rank || '');
   };
 
   const handleUpdateEmployee = async (e: React.FormEvent) => {
@@ -5142,9 +5154,11 @@ export default function AdminDashboard({
                       const firstEmp = employees.filter(e => e.status !== 'pending')[0];
                       if (firstEmp) {
                         setAttestationEmployeeId(firstEmp.id);
+                        const firstPosCode = firstEmp.positionCode || firstEmp.profile?.positionCode;
+                        const firstRank = firstEmp.rank || firstEmp.profile?.rank;
                         const assigned = courses.filter(c => 
-                          c.positionCode === firstEmp.profile.positionCode && 
-                          (!c.rank || c.rank === firstEmp.profile.rank)
+                          c.positionCode === firstPosCode && 
+                          (!c.rank || c.rank === firstRank)
                         );
                         if (assigned.length > 0) {
                           setAttestationCourseId(assigned[0].id);
@@ -5369,9 +5383,11 @@ export default function AdminDashboard({
 
                     <div className="space-y-3">
                       {employees.filter(emp => emp.status !== 'pending').map((emp) => {
+                        const empPosCode = emp.positionCode || emp.profile?.positionCode;
+                        const empRank = emp.rank || emp.profile?.rank;
                         const assignedCourses = courses.filter(c => 
-                          c.positionCode === emp.profile.positionCode && 
-                          (!c.rank || c.rank === emp.profile.rank)
+                          c.positionCode === empPosCode && 
+                          (!c.rank || c.rank === empRank)
                         );
                         const totalLessons = assignedCourses.reduce((sum, c) => sum + c.lessons.length, 0);
                         const empGrades = grades.filter(g => g.employeeId === emp.id);
@@ -5385,7 +5401,7 @@ export default function AdminDashboard({
                               <div>
                                 <h4 className="font-bold text-xs text-slate-900 leading-tight">{emp.name}</h4>
                                 <span className="text-[9px] text-slate-400 block font-semibold">
-                                  {emp.profile.positionName} {emp.profile.rank ? `• ${emp.profile.rank}` : ''}
+                                  {emp.positionName || emp.profile?.positionName} {empRank ? `• ${empRank}` : ''}
                                 </span>
                               </div>
                               <span className={`text-xs font-mono font-bold shrink-0 px-2 py-0.5 rounded-lg ${
@@ -5489,13 +5505,15 @@ export default function AdminDashboard({
                     ) : (
                       filteredAttestationEmployees.map((emp) => {
                         const isSelected = emp.id === attestationEmployeeId;
+                        const empPosCode = emp.positionCode || emp.profile?.positionCode;
+                        const empRank = emp.rank || emp.profile?.rank;
                         
                         // Calculate metrics
                         const assignedCourses = courses.filter(c => {
                           if (c.bindings && c.bindings.length > 0) {
-                            return c.bindings.some(b => b.positionCode === emp.profile.positionCode && (!b.rank || b.rank === emp.profile.rank));
+                            return c.bindings.some(b => b.positionCode === empPosCode && (!b.rank || b.rank === empRank));
                           }
-                          return c.positionCode === emp.profile.positionCode && (!c.rank || c.rank === emp.profile.rank);
+                          return c.positionCode === empPosCode && (!c.rank || c.rank === empRank);
                         });
                         const totalLessons = assignedCourses.reduce((sum, c) => sum + c.lessons.length, 0);
                         const empGrades = grades.filter(g => g.employeeId === emp.id);
@@ -5516,9 +5534,9 @@ export default function AdminDashboard({
                               // Select the recommended course if none selected or not assigned to the new employee
                               const assigned = courses.filter(c => {
                                 if (c.bindings && c.bindings.length > 0) {
-                                  return c.bindings.some(b => b.positionCode === emp.profile.positionCode && (!b.rank || b.rank === emp.profile.rank));
+                                  return c.bindings.some(b => b.positionCode === empPosCode && (!b.rank || b.rank === empRank));
                                 }
-                                return c.positionCode === emp.profile.positionCode && (!c.rank || c.rank === emp.profile.rank);
+                                return c.positionCode === empPosCode && (!c.rank || c.rank === empRank);
                               });
                               if (assigned.length > 0) {
                                 setAttestationCourseId(assigned[0].id);
@@ -5559,7 +5577,7 @@ export default function AdminDashboard({
                               </div>
                               
                               <p className="text-[10px] text-slate-500 font-semibold truncate leading-none">
-                                {emp.profile.positionName} {emp.profile.rank ? `(${emp.profile.rank})` : ''}
+                                {emp.positionName || emp.profile?.positionName} {empRank ? `(${empRank})` : ''}
                               </p>
                               <p className="text-[9px] text-slate-400 truncate leading-tight pt-0.5">
                                 Аттестовано уроков: <span className="font-semibold text-slate-600">{empGrades.length}</span> из {totalLessons}
@@ -5600,11 +5618,13 @@ export default function AdminDashboard({
                       );
                     }
 
+                    const selectedPosCode = selectedEmpObj.positionCode || selectedEmpObj.profile?.positionCode;
+                    const selectedRank = selectedEmpObj.rank || selectedEmpObj.profile?.rank;
                     const assignedCourses = courses.filter(c => {
                       if (c.bindings && c.bindings.length > 0) {
-                        return c.bindings.some(b => b.positionCode === selectedEmpObj.profile.positionCode && (!b.rank || b.rank === selectedEmpObj.profile.rank));
+                        return c.bindings.some(b => b.positionCode === selectedPosCode && (!b.rank || b.rank === selectedRank));
                       }
-                      return c.positionCode === selectedEmpObj.profile.positionCode && (!c.rank || c.rank === selectedEmpObj.profile.rank);
+                      return c.positionCode === selectedPosCode && (!c.rank || c.rank === selectedRank);
                     });
                     
                     const isAssigned = selectedCourseObj && assignedCourses.some(c => c.id === selectedCourseObj.id);
@@ -5624,7 +5644,7 @@ export default function AdminDashboard({
                                 {selectedEmpObj.name}
                               </h3>
                               <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                                {selectedEmpObj.profile.positionName} {selectedEmpObj.profile.rank ? `• ${selectedEmpObj.profile.rank}` : ''} • {selectedEmpObj.profile.department}
+                                {selectedEmpObj.positionName || selectedEmpObj.profile?.positionName} {selectedRank ? `• ${selectedRank}` : ''} • {selectedEmpObj.department || selectedEmpObj.profile?.department}
                               </p>
                             </div>
                           </div>
@@ -5676,8 +5696,8 @@ export default function AdminDashboard({
                               <option value="">-- Выберите учебный курс --</option>
                               {courses.map(course => {
                                 const recommended = course.bindings && course.bindings.length > 0 
-                                  ? course.bindings.some(b => b.positionCode === selectedEmpObj.profile.positionCode && (!b.rank || b.rank === selectedEmpObj.profile.rank))
-                                  : course.positionCode === selectedEmpObj.profile.positionCode && (!course.rank || course.rank === selectedEmpObj.profile.rank);
+                                  ? course.bindings.some(b => b.positionCode === selectedPosCode && (!b.rank || b.rank === selectedRank))
+                                  : course.positionCode === selectedPosCode && (!course.rank || course.rank === selectedRank);
                                 return (
                                   <option key={course.id} value={course.id}>
                                     {course.title} {recommended ? ' (Рекомендован)' : ' (Вне программы)'}
@@ -5699,7 +5719,7 @@ export default function AdminDashboard({
                                   {isAssigned ? 'Рекомендованный' : 'Дополнительный'}
                                 </span>
                                 {(() => {
-                                  const startedDates = selectedEmpObj.profile.courseStartedDates || {};
+                                  const startedDates = selectedEmpObj.courseStartedDates || selectedEmpObj.profile?.courseStartedDates || {};
                                   const startedAtStr = startedDates[selectedCourseObj.id];
                                   const studyDays = selectedCourseObj.studyDurationDays || 7;
                                   const examDays = selectedCourseObj.examDurationDays || 3;
@@ -5725,14 +5745,14 @@ export default function AdminDashboard({
                                 <input
                                   type="date"
                                   value={(() => {
-                                    const startedDates = selectedEmpObj.profile.courseStartedDates || {};
+                                    const startedDates = selectedEmpObj.courseStartedDates || selectedEmpObj.profile?.courseStartedDates || {};
                                     const startedAtStr = startedDates[selectedCourseObj.id];
                                     return startedAtStr ? startedAtStr.split('T')[0] : '';
                                   })()}
                                   onChange={async (e) => {
                                     const val = e.target.value;
                                     const updatedStarts = {
-                                      ...(selectedEmpObj.profile.courseStartedDates || {}),
+                                      ...(selectedEmpObj.courseStartedDates || selectedEmpObj.profile?.courseStartedDates || {}),
                                     };
                                     if (val) {
                                       updatedStarts[selectedCourseObj.id] = new Date(val).toISOString();

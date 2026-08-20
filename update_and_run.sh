@@ -58,6 +58,7 @@ run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);"
 run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;"
 
 run_psql "UPDATE employees e SET rank_id = r.id FROM ranks r WHERE e.rank_id IS NULL AND r.position_code = e.position_code;"
+run_psql "UPDATE employees SET rank_id = (SELECT id FROM ranks LIMIT 1) WHERE rank_id IS NULL AND (SELECT COUNT(*) FROM ranks) > 0;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;"
 run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;"
