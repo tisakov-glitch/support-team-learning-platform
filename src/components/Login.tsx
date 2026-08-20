@@ -93,14 +93,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="p-8 sm:p-10">
             {/* Header Title inside card */}
             <div className="text-center mb-8">
-              <div className="flex justify-center mb-4">
-                <img 
-                  src="/retmind-logo.png" 
-                  alt="Retmind" 
-                  className="h-12 w-auto object-contain px-3 py-1.5 bg-[#F7F5F2] rounded-xl border border-[#C9B87A]/30"
-                />
+              <div className="inline-flex p-3.5 rounded-2xl bg-[#F5EFD7] text-[#0F172A] mb-3 border border-[#C9B87A]/40 shadow-xs">
+                <ShieldCheck className="w-7 h-7 text-[#A08C4A]" />
               </div>
-              <h1 className="text-lg font-bold uppercase tracking-[0.14em] text-[#0F172A]">
+              <h1 className="text-xl font-bold uppercase tracking-[0.12em] text-[#0F172A]">
                 Вход в систему
               </h1>
               <p className="text-xs text-[#0F172A]/60 mt-1.5 tracking-wide">
