@@ -7,6 +7,8 @@ interface ImageTicketAnalyzerProps {
       requesterName?: string;
       client?: string;
       storeId?: string;
+      channel?: string;
+      country?: string;
       subject?: string;
       description?: string;
       system?: string;
@@ -14,6 +16,12 @@ interface ImageTicketAnalyzerProps {
       type?: string;
       action?: string;
       kind?: string;
+      datetime?: string;
+      startedWorkingAt?: string;
+      closedAt?: string;
+      confirmedAt?: string;
+      resolutionComment?: string;
+      status?: string;
     },
     isAppend?: boolean
   ) => void;
