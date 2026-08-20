@@ -36,35 +36,7 @@ export POSTGRES_USER="${POSTGRES_USER:-talgat}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-talgat}"
 export POSTGRES_DB="${POSTGRES_DB:-onb}"
 
-echo "🗄️ Applying PostgreSQL database DDL migrations (rank_id FK & profile normalization)..."
-
-run_psql() {
-  if [ -n "$DATABASE_URL" ]; then
-    psql "$DATABASE_URL" -c "$1" 2>/dev/null || PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1" 2>/dev/null || psql -U postgres -d support_db -c "$1" 2>/dev/null || true
-  else
-    PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1" 2>/dev/null \
-    || psql -U postgres -d support_db -c "$1" 2>/dev/null \
-    || psql -U postgres -d postgres -c "$1" 2>/dev/null \
-    || true
-  fi
-}
-
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);"
-run_psql "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id') THEN ALTER TABLE employees ADD CONSTRAINT fk_employees_rank_id FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL; END IF; EXCEPTION WHEN OTHERS THEN END \$\$;"
-run_psql "ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;"
-
-run_psql "UPDATE employees e SET rank_id = r.id FROM ranks r WHERE e.rank_id IS NULL AND r.position_code = e.position_code;"
-run_psql "UPDATE employees SET rank_id = (SELECT id FROM ranks LIMIT 1) WHERE rank_id IS NULL AND (SELECT COUNT(*) FROM ranks) > 0;"
-run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS rank_name CASCADE;"
-run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;"
-run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;"
-run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;"
-run_psql "ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;"
+echo "🗄️ Applying PostgreSQL database DDL migrations from scripts/schema.sql..."
 
 if [ -n "$DATABASE_URL" ]; then
   psql "$DATABASE_URL" -f scripts/schema.sql 2>/dev/null || PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f scripts/schema.sql 2>/dev/null || psql -U postgres -d support_db -f scripts/schema.sql 2>/dev/null || true
@@ -74,10 +46,6 @@ else
   || psql -U postgres -d postgres -f scripts/schema.sql 2>/dev/null \
   || true
 fi
-
-run_psql "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;"
-run_psql "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO PUBLIC;"
-run_psql "GRANT ALL PRIVILEGES ON SCHEMA public TO PUBLIC;"
 
 MODE="${1:-prod}"
 
