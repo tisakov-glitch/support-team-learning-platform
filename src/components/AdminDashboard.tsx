@@ -213,6 +213,7 @@ export default function AdminDashboard({
   const [newTicketStartedWorkingAt, setNewTicketStartedWorkingAt] = useState('');
   const [newTicketClosedAt, setNewTicketClosedAt] = useState('');
   const [newTicketConfirmedAt, setNewTicketConfirmedAt] = useState('');
+  const [newTicketResolutionComment, setNewTicketResolutionComment] = useState('');
   const [newTicketConfirmationAttachment, setNewTicketConfirmationAttachment] = useState<{ name: string; size: number; type: string; url: string } | null>(null);
   const [newTicketAssignedToId, setNewTicketAssignedToId] = useState('');
   const [newTicketAssignedToName, setNewTicketAssignedToName] = useState('');
@@ -1255,6 +1256,7 @@ export default function AdminDashboard({
           startedWorkingAt: newTicketStartedWorkingAt ? new Date(newTicketStartedWorkingAt).toISOString() : undefined,
           closedAt: newTicketClosedAt ? new Date(newTicketClosedAt).toISOString() : undefined,
           confirmedAt: newTicketConfirmedAt ? new Date(newTicketConfirmedAt).toISOString() : undefined,
+          resolutionComment: newTicketResolutionComment || undefined,
           confirmationAttachment: newTicketConfirmationAttachment || undefined,
           assignedToId: newTicketAssignedToId || undefined,
           assignedToName: newTicketAssignedToName || undefined
@@ -1285,6 +1287,7 @@ export default function AdminDashboard({
       setNewTicketStartedWorkingAt('');
       setNewTicketClosedAt('');
       setNewTicketConfirmedAt('');
+      setNewTicketResolutionComment('');
       setNewTicketConfirmationAttachment(null);
       setShowAddTicketForm(false);
     } catch (err: any) {
