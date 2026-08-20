@@ -910,6 +910,35 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   } catch (e: any) {
     console.warn('Notice ensuring employees table normalization:', e.message);
   }
+
+  try {
+    const db = readDB();
+    let updatedDb = false;
+    for (const empId of Object.keys(db.employees || {})) {
+      const emp = db.employees[empId];
+      if (emp && emp.role !== 'admin') {
+        emp.role = 'employee';
+        emp.departmentId = 'dept-5';
+        emp.department = 'RetMind Support';
+        emp.positionCode = '12';
+        emp.positionName = 'Support Shift Manager';
+        emp.rankId = '12-shift-manager-l1';
+        emp.rank = 'Shift Manager L1';
+        if (emp.profile) {
+          emp.profile.departmentId = 'dept-5';
+          emp.profile.department = 'RetMind Support';
+          emp.profile.positionCode = '12';
+          emp.profile.positionName = 'Support Shift Manager';
+          emp.profile.rankId = '12-shift-manager-l1';
+          emp.profile.rank = 'Shift Manager L1';
+        }
+        updatedDb = true;
+      }
+    }
+    if (updatedDb) {
+      writeDB(db);
+    }
+  } catch (e) {}
 }
 
 async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {

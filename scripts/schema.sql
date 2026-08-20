@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS departments (
     id VARCHAR(10) PRIMARY KEY,
     name VARCHAR(50) NOT NULL
 );
+INSERT INTO departments (id, name) VALUES ('dept-5', 'RetMind Support') ON CONFLICT (id) DO NOTHING;
 
 -- 2. Roles Table
 CREATE TABLE IF NOT EXISTS roles (
@@ -14,6 +15,11 @@ CREATE TABLE IF NOT EXISTS roles (
     name VARCHAR(255) NOT NULL,
     system_role VARCHAR(64) NOT NULL
 );
+INSERT INTO roles (code, name, system_role) VALUES 
+  ('employee', 'Employee', 'employee'),
+  ('manager', 'Manager', 'manager'),
+  ('admin', 'Admin', 'admin')
+ON CONFLICT (code) DO NOTHING;
 
 -- 3. Positions Table
 CREATE TABLE IF NOT EXISTS positions (
@@ -22,6 +28,9 @@ CREATE TABLE IF NOT EXISTS positions (
     department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL,
     role_code VARCHAR(64) REFERENCES roles(code) ON DELETE SET NULL
 );
+INSERT INTO positions (code, name, department_id, role_code) VALUES 
+  ('12', 'Support Shift Manager', 'dept-5', 'employee')
+ON CONFLICT (code) DO NOTHING;
 
 -- 4. Ranks Table
 CREATE TABLE IF NOT EXISTS ranks (
