@@ -880,7 +880,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
 
       INSERT INTO ranks (id, position_code, name, sort_order)
       VALUES 
-        ('no-rank', NULL, 'Без ранга', 0),
         ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
@@ -998,7 +997,7 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
           e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
           e.role, e.status, e.created_at as "createdAt", e.password,
           e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-          e.rank_id as "rankId", COALESCE(r.name, 'Без ранга') as "rankName",
+          e.rank_id as "rankId", COALESCE(r.name, '') as "rankName",
           e.course_started_dates as "courseStartedDates",
           d.name as "departmentName", p.name as "positionName"
         FROM employees e
@@ -1012,7 +1011,7 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
           e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
           e.role, e.status, e.created_at as "createdAt", e.password,
           e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-          'no-rank' as "rankId", 'Без ранга' as "rankName",
+          '' as "rankId", '' as "rankName",
           e.course_started_dates as "courseStartedDates",
           d.name as "departmentName", p.name as "positionName"
         FROM employees e
@@ -1657,7 +1656,7 @@ async function startServer() {
           } catch (e) {}
         }
         if (!finalRankId) {
-          finalRankId = 'no-rank';
+          finalRankId = null;
         }
 
         await pgPool!.query(
@@ -1855,13 +1854,7 @@ async function startServer() {
           } catch (e) {}
         }
         if (!finalRankId) {
-          // Check if position has ranks
-          try {
-            const posRanks = await pgPool!.query('SELECT id FROM ranks WHERE position_code = $1 LIMIT 1', [targetEmployee.positionCode || '']);
-            if (posRanks.rows.length === 0) {
-              finalRankId = 'no-rank';
-            }
-          } catch (e) {}
+          finalRankId = null;
         }
 
         await pgPool!.query(

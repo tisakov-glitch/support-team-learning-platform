@@ -45,7 +45,6 @@ GRANT ALL ON TABLE ranks TO PUBLIC;
 
 INSERT INTO ranks (id, position_code, name, sort_order)
 VALUES 
-  ('no-rank', NULL, 'Без ранга', 0),
   ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
