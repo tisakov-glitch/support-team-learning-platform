@@ -813,38 +813,31 @@ if (process.env.POSTGRES_HOST || process.env.DATABASE_URL) {
   pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
 }
 
-async function ensureEmployeesTableNormalized(client: pg.PoolClient) {
+async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
   try {
-    await client.query(`
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;
-    `);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_name VARCHAR(255);`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS bio TEXT;`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS specializations TEXT[] DEFAULT '{}';`);
+    await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`);
 
-    const checkNameCol = await client.query(`
-      SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'
-    `);
+    const checkNameCol = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'`);
     if (checkNameCol.rowCount && checkNameCol.rowCount > 0) {
       await client.query(`
         UPDATE employees SET 
           first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
           last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
         WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
-        
-        ALTER TABLE employees DROP COLUMN IF EXISTS name;
       `);
+      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name;`);
     }
 
-    const checkProfileCol = await client.query(`
-      SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'
-    `);
+    const checkProfileCol = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'`);
     if (checkProfileCol.rowCount && checkProfileCol.rowCount > 0) {
       await client.query(`
         UPDATE employees SET
@@ -854,12 +847,12 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient) {
           rank_name = COALESCE(rank_name, profile->>'rank'),
           bio = COALESCE(bio, profile->>'bio'),
           course_started_dates = COALESCE(course_started_dates, profile->'courseStartedDates');
-        
-        ALTER TABLE employees DROP COLUMN IF EXISTS profile;
       `);
+      await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile;`);
     }
-  } catch (err) {
-    console.warn('Warning normalizing employees table:', err);
+    console.log('✅ PostgreSQL employees table schema migration completed (profile column dropped, normalized columns active)');
+  } catch (err: any) {
+    console.warn('Warning normalizing employees table:', err.message || err);
   }
 }
 
@@ -1664,6 +1657,36 @@ async function startServer() {
 
     db.employees[id] = targetEmployee;
     writeDB(db);
+
+    if (pgPool) {
+      pgPool.query(
+        `UPDATE employees SET
+           first_name = $1,
+           last_name = $2,
+           email = $3,
+           role = $4,
+           phone = $5,
+           department_id = $6,
+           position_code = $7,
+           rank_name = $8,
+           bio = $9,
+           specializations = $10
+         WHERE id = $11`,
+        [
+          targetEmployee.firstName || '',
+          targetEmployee.lastName || '',
+          targetEmployee.email,
+          targetEmployee.role,
+          targetEmployee.phone || null,
+          targetEmployee.departmentId || null,
+          targetEmployee.positionCode || null,
+          targetEmployee.rank || null,
+          targetEmployee.bio || null,
+          targetEmployee.specializations || [],
+          id
+        ]
+      ).catch(err => console.error('Error directly updating employee in PostgreSQL:', err));
+    }
 
     const { password: _, ...updatedWithoutPassword } = targetEmployee;
     res.json(updatedWithoutPassword);
