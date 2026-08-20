@@ -999,6 +999,29 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
         ]
       );
     }
+
+    const invList = Object.values(data.invitations || {});
+    for (const inv of invList) {
+      try {
+        await pgPool.query(
+          `INSERT INTO invitations (id, employee_id, email, token, status, sent_at, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, expires_at = EXCLUDED.expires_at`,
+          [inv.id, inv.employeeId, inv.email, inv.token, inv.status, inv.sentAt, inv.expiresAt]
+        );
+      } catch (e) {}
+    }
+
+    for (const em of data.emails || []) {
+      try {
+        await pgPool.query(
+          `INSERT INTO emails (id, to_email, subject, body, token, sent_at, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status`,
+          [em.id, em.to, em.subject, em.body, em.token, em.sentAt, em.status]
+        );
+      } catch (e) {}
+    }
   } catch (err) {
     console.error('Error saving to PostgreSQL:', err);
   }
@@ -1170,8 +1193,10 @@ async function startServer() {
     db.invitations[token] = newInvitation;
 
     // Simulate sending email by writing to simulated emails list
-    const invitationLink = `/onboarding/${token}`;
-    const emailBody = `Здравствуйте, ${name}!\n\nВас зарегистрировали на обучающей платформе поддержки.\nДля настройки учетной записи, пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nС уважением,\nКоманда Support Team Learning`;
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
+    const invitationLink = `${protocol}://${host}/onboarding/${token}`;
+    const emailBody = `Здравствуйте, ${name}!\n\nВас зарегистрировали на обучающей платформе поддержки.\nДля настройки учетной записи, создания пароля и активации аккаунта перейдите по следующей ссылке:\n\n${invitationLink}\n\nС уважением,\nКоманда Support Team Learning`;
 
     const newEmail: SimulatedEmail = {
       id: 'email-' + Math.random().toString(36).substr(2, 9),
