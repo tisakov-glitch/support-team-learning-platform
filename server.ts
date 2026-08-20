@@ -2266,11 +2266,20 @@ async function generateGeminiContent(ai: any, params: any) {
       });
 
       const db = readDB();
-      const validClients = db.supportClients?.map(c => c.name) || [];
-      const validStores = db.supportStores?.map(s => ({ id: s.id, name: s.name, code: s.code, clientId: s.clientId, country: s.country })) || [];
-      const validKinds = db.supportKinds?.map(k => k.name) || [];
-      const validChannels = db.supportChannels?.map(ch => ({ code: ch.code, name: ch.name })) || [];
-      const validCountries = db.supportCountries?.map(cnt => ({ id: cnt.id, code: cnt.code, name: cnt.name })) || [];
+      const clientMap = new Map((db.supportClients || []).map(c => [c.id, c.name]));
+      const countryMap = new Map((db.supportCountries || []).map(cnt => [cnt.id, cnt.name]));
+
+      const validClients = (db.supportClients || []).map(c => c.name);
+      const validStores = (db.supportStores || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        clientName: clientMap.get(s.clientId) || '',
+        countryName: countryMap.get(s.countryId || '') || s.country || ''
+      }));
+      const validKinds = (db.supportKinds || []).map(k => k.name);
+      const validChannels = (db.supportChannels || []).map(ch => ({ code: ch.code, name: ch.name }));
+      const validCountries = (db.supportCountries || []).map(cnt => ({ id: cnt.id, code: cnt.code, name: cnt.name }));
 
       const serverTime = new Date();
       const tzoffset = serverTime.getTimezoneOffset() * 60000;
@@ -2395,11 +2404,20 @@ ${JSON.stringify(validKinds, null, 2)}
       });
 
       const db = readDB();
-      const validClients = db.supportClients?.map(c => c.name) || [];
-      const validStores = db.supportStores?.map(s => ({ id: s.id, name: s.name, code: s.code, clientId: s.clientId, country: s.country })) || [];
-      const validKinds = db.supportKinds?.map(k => k.name) || [];
-      const validChannels = db.supportChannels?.map(ch => ({ code: ch.code, name: ch.name })) || [];
-      const validCountries = db.supportCountries?.map(cnt => ({ id: cnt.id, code: cnt.code, name: cnt.name })) || [];
+      const clientMap = new Map((db.supportClients || []).map(c => [c.id, c.name]));
+      const countryMap = new Map((db.supportCountries || []).map(cnt => [cnt.id, cnt.name]));
+
+      const validClients = (db.supportClients || []).map(c => c.name);
+      const validStores = (db.supportStores || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        clientName: clientMap.get(s.clientId) || '',
+        countryName: countryMap.get(s.countryId || '') || s.country || ''
+      }));
+      const validKinds = (db.supportKinds || []).map(k => k.name);
+      const validChannels = (db.supportChannels || []).map(ch => ({ code: ch.code, name: ch.name }));
+      const validCountries = (db.supportCountries || []).map(cnt => ({ id: cnt.id, code: cnt.code, name: cnt.name }));
 
       const serverTime = new Date();
       const tzoffset = serverTime.getTimezoneOffset() * 60000;

@@ -1120,29 +1120,6 @@ export default function AdminDashboard({
       }
     }
 
-    if (data.client) {
-      const matchedClient = supportClients.find(c => 
-        c.name.toLowerCase() === data.client.toLowerCase() ||
-        c.name.toLowerCase().includes(data.client.toLowerCase())
-      );
-      if (matchedClient) {
-        setNewTicketClient(matchedClient.name);
-        if (!data.country && matchedClient.countries && matchedClient.countries.length > 0) {
-          setNewTicketCountry(matchedClient.countries[0]);
-        }
-      } else {
-        const partialMatch = supportClients.find(c =>
-          data.client.toLowerCase().includes(c.name.toLowerCase())
-        );
-        if (partialMatch) {
-          setNewTicketClient(partialMatch.name);
-          if (!data.country && partialMatch.countries && partialMatch.countries.length > 0) {
-            setNewTicketCountry(partialMatch.countries[0]);
-          }
-        }
-      }
-    }
-
     if (data.storeId) {
       if (data.storeId === 'all') {
         setNewTicketStoreId('all');
@@ -1152,18 +1129,43 @@ export default function AdminDashboard({
         const matchedStore = supportStores.find(s => 
           s.id === data.storeId || 
           (s.code && s.code.toLowerCase() === data.storeId.toLowerCase()) ||
-          s.name.toLowerCase().includes(data.storeId.toLowerCase())
+          s.name.toLowerCase().includes(data.storeId.toLowerCase()) ||
+          data.storeId.toLowerCase().includes(s.name.toLowerCase())
         );
         if (matchedStore) {
           setNewTicketStoreId(matchedStore.id);
           setNewTicketStoreName(`${matchedStore.name} (${matchedStore.code || ''})`);
           setNewTicketCreatorType('store');
+
+          // Auto-infer Client from Store
+          const storeClient = supportClients.find(c => c.id === matchedStore.clientId);
+          if (storeClient) {
+            setNewTicketClient(storeClient.name);
+          }
+
+          // Auto-infer Country from Store
           if (matchedStore.countryId) {
             const storeCountryObj = (supportCountries || []).find(c => c.id === matchedStore.countryId);
             if (storeCountryObj) {
               setNewTicketCountry(storeCountryObj.name);
             }
+          } else if (matchedStore.country) {
+            setNewTicketCountry(matchedStore.country);
           }
+        }
+      }
+    }
+
+    if (data.client) {
+      const matchedClient = supportClients.find(c => 
+        c.name.toLowerCase() === data.client.toLowerCase() ||
+        c.name.toLowerCase().includes(data.client.toLowerCase()) ||
+        data.client.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (matchedClient) {
+        setNewTicketClient(matchedClient.name);
+        if (matchedClient.countries && matchedClient.countries.length > 0) {
+          setNewTicketCountry(prev => prev || matchedClient.countries[0]);
         }
       }
     }
