@@ -32,9 +32,6 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
-echo "🗄️ Running PostgreSQL database migration (dropping legacy countries column)..."
-npx tsx scripts/init_postgres.ts || true
-
 MODE="${1:-prod}"
 
 if [ "$MODE" = "dev" ]; then
