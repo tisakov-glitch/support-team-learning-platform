@@ -899,9 +899,10 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
 
       UPDATE employees 
       SET 
+        role = COALESCE(NULLIF(role, ''), 'employee'),
         department_id = COALESCE(department_id, 'dept-5'),
         position_code = COALESCE(position_code, '12')
-      WHERE role != 'admin' AND (department_id IS NULL OR position_code IS NULL);
+      WHERE role IS NULL OR role = '' OR department_id IS NULL OR position_code IS NULL;
     `);
     console.log('✅ Safely checked non-admin employee defaults');
   } catch (e: any) {
@@ -913,24 +914,30 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     let updatedDb = false;
     for (const empId of Object.keys(db.employees || {})) {
       const emp = db.employees[empId];
-      if (emp && emp.role !== 'admin') {
-        if (!emp.departmentId) {
-          emp.departmentId = 'dept-5';
-          emp.department = 'RetMind Support';
-          if (emp.profile) {
-            emp.profile.departmentId = 'dept-5';
-            emp.profile.department = 'RetMind Support';
-          }
+      if (emp) {
+        if (!emp.role) {
+          emp.role = 'employee';
           updatedDb = true;
         }
-        if (!emp.positionCode) {
-          emp.positionCode = '12';
-          emp.positionName = 'Support Shift Manager';
-          if (emp.profile) {
-            emp.profile.positionCode = '12';
-            emp.profile.positionName = 'Support Shift Manager';
+        if (emp.role !== 'admin') {
+          if (!emp.departmentId) {
+            emp.departmentId = 'dept-5';
+            emp.department = 'RetMind Support';
+            if (emp.profile) {
+              emp.profile.departmentId = 'dept-5';
+              emp.profile.department = 'RetMind Support';
+            }
+            updatedDb = true;
           }
-          updatedDb = true;
+          if (!emp.positionCode) {
+            emp.positionCode = '12';
+            emp.positionName = 'Support Shift Manager';
+            if (emp.profile) {
+              emp.profile.positionCode = '12';
+              emp.profile.positionName = 'Support Shift Manager';
+            }
+            updatedDb = true;
+          }
         }
       }
     }
@@ -1824,9 +1831,17 @@ async function startServer() {
       const matchedPos = (db.positions || []).find(p => p.code === positionCode);
       if (matchedPos) {
         targetEmployee.positionName = matchedPos.name;
+        if (!role && matchedPos.roleCode) {
+          const roleObj = (db.roles || []).find(r => r.code === matchedPos.roleCode || r.systemRole === matchedPos.roleCode);
+          targetEmployee.role = (roleObj?.systemRole || matchedPos.roleCode || targetEmployee.role || 'employee') as UserRole;
+        }
       }
     }
     if (positionName !== undefined) targetEmployee.positionName = positionName;
+
+    if (!targetEmployee.role) {
+      targetEmployee.role = 'employee';
+    }
 
     const targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
     const currentPosCode = positionCode !== undefined ? positionCode : targetEmployee.positionCode;
@@ -1910,7 +1925,7 @@ async function startServer() {
             targetEmployee.firstName || '',
             targetEmployee.lastName || '',
             targetEmployee.email,
-            targetEmployee.role,
+            targetEmployee.role || 'employee',
             targetEmployee.phone || null,
             finalDeptId || null,
             targetEmployee.positionCode || null,

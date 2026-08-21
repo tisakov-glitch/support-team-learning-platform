@@ -1753,9 +1753,13 @@ export default function AdminDashboard({
     setNewPositionCode(code);
     const pos = dbPositions.find(p => p.code === code);
     if (pos) {
-      const roleObj = dbRoles.find(r => r.code === pos.roleCode);
-      if (roleObj) {
+      const roleObj = dbRoles.find(r => r.code === pos.roleCode || r.systemRole === pos.roleCode);
+      if (roleObj && roleObj.systemRole) {
         setNewRole(roleObj.systemRole);
+      } else if (pos.roleCode === 'admin' || pos.roleCode === 'manager' || pos.roleCode === 'employee') {
+        setNewRole(pos.roleCode);
+      } else {
+        setNewRole('employee');
       }
       if (pos.ranks && pos.ranks.length > 0) {
         setNewRank(pos.ranks[0]);
@@ -1771,9 +1775,13 @@ export default function AdminDashboard({
     setEditPositionCode(code);
     const pos = dbPositions.find(p => p.code === code);
     if (pos) {
-      const roleObj = dbRoles.find(r => r.code === pos.roleCode);
-      if (roleObj) {
+      const roleObj = dbRoles.find(r => r.code === pos.roleCode || r.systemRole === pos.roleCode);
+      if (roleObj && roleObj.systemRole) {
         setEditRole(roleObj.systemRole);
+      } else if (pos.roleCode === 'admin' || pos.roleCode === 'manager' || pos.roleCode === 'employee') {
+        setEditRole(pos.roleCode);
+      } else {
+        setEditRole('employee');
       }
       if (pos.ranks && pos.ranks.length > 0) {
         setEditRank(pos.ranks[0]);
