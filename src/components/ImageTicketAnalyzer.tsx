@@ -37,6 +37,26 @@ export const ImageTicketAnalyzer: React.FC<ImageTicketAnalyzerProps> = ({ onReco
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            processFile(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isAppendMode]);
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -203,13 +223,14 @@ export const ImageTicketAnalyzer: React.FC<ImageTicketAnalyzerProps> = ({ onReco
             onClick={handleButtonClick}
             disabled={isAnalyzing}
             className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-700 hover:text-indigo-600 transition-colors disabled:opacity-50 cursor-pointer"
+            title="Загрузить файл или вставить скриншот из буфера обмена (Ctrl+V / Cmd+V)"
           >
             {isAnalyzing ? (
               <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
             ) : (
               <UploadCloud className="w-3.5 h-3.5 text-slate-500 hover:text-indigo-500" />
             )}
-            <span>{isAnalyzing ? 'ИИ сканирует...' : 'Сканировать скриншот'}</span>
+            <span>{isAnalyzing ? 'ИИ сканирует...' : 'Сканировать скриншот (Ctrl+V)'}</span>
           </button>
         </div>
       </div>

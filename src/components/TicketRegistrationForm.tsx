@@ -71,6 +71,27 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
         }
       })
       .catch(() => {});
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            files.push(file);
+          }
+        }
+      }
+      if (files.length > 0) {
+        handleFileAttachment(files);
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -752,7 +773,7 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
         <div className="flex items-center gap-3">
           <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
             <Paperclip className="w-4 h-4" />
-            <span>Прикрепить файл</span>
+            <span>Прикрепить файл (или Ctrl+V)</span>
             <input
               type="file"
               multiple
