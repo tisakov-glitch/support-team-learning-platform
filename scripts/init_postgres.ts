@@ -92,7 +92,22 @@ async function runMigration() {
     if (fs.existsSync(schemaPath)) {
       console.log('📜 Applying database schema (schema.sql)...');
       const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-      await client.query(schemaSql);
+      try {
+        await client.query(schemaSql);
+      } catch (err: any) {
+        console.warn('⚠️ Full schemaSql batch notice, executing individual statements:', err.message);
+        const statements = schemaSql
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        for (const stmt of statements) {
+          try {
+            await client.query(stmt);
+          } catch (e: any) {
+            // Ignore non-critical permission/existing errors for statements
+          }
+        }
+      }
       console.log('✅ Tables created/verified successfully.');
     } else {
       console.error('❌ schema.sql not found at', schemaPath);

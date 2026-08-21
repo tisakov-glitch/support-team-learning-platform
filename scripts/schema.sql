@@ -40,8 +40,6 @@ CREATE TABLE IF NOT EXISTS ranks (
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE ranks ALTER COLUMN position_code DROP NOT NULL;
-GRANT ALL ON TABLE ranks TO PUBLIC;
 
 INSERT INTO ranks (id, position_code, name, sort_order)
 VALUES 
