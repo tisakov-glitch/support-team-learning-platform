@@ -30,9 +30,6 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm install
 
-echo "🗄️ Normalizing & syncing PostgreSQL database schema..."
-npm run db:init || true
-
 MODE="${1:-prod}"
 
 if [ "$MODE" = "dev" ]; then

@@ -901,11 +901,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
 
   try {
     await client.query(`
-      INSERT INTO ranks (id, position_code, name, sort_order)
-      VALUES 
-        ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
 
       DO $$ 
@@ -1010,27 +1005,9 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         pos.ranks = ranksByPos[pos.code];
       } else {
         const defPos = defaultPositions.find((p: any) => p.code === pos.code);
-        if (defPos && defPos.ranks && defPos.ranks.length > 0) {
-          pos.ranks = defPos.ranks;
-          // Auto-seed into PostgreSQL ranks table
-          for (let i = 0; i < defPos.ranks.length; i++) {
-            const rName = defPos.ranks[i];
-            const rId = `${pos.code}-${rName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-            try {
-              await client.query(
-                `INSERT INTO ranks (id, position_code, name, sort_order)
-                 VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order`,
-                [rId, pos.code, rName, i + 1]
-              );
-            } catch (e) {
-              // Ignore if ranks table is not available
-            }
-          }
-        } else {
-          pos.ranks = [];
-        }
+        pos.ranks = defPos?.ranks || [];
       }
+    }
     }
 
     let employeesRows: any[] = [];
