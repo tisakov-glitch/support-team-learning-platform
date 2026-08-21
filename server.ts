@@ -16,8 +16,34 @@ import { TICKET_CATEGORIES } from './src/ticketCategories';
 import pg from 'pg';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 dotenv.config();
+
+export function hashPassword(password: string): string {
+  if (!password) return '';
+  if (password.startsWith('scrypt:')) return password;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash?: string): boolean {
+  if (!storedHash || !password) return false;
+  if (!storedHash.startsWith('scrypt:')) {
+    return storedHash === password;
+  }
+  const parts = storedHash.split(':');
+  if (parts.length !== 3) return false;
+  const salt = parts[1];
+  const originalHash = parts[2];
+  const derivedHash = crypto.scryptSync(password, salt, 64).toString('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(derivedHash, 'hex'), Buffer.from(originalHash, 'hex'));
+  } catch (e) {
+    return false;
+  }
+}
 
 async function ensureTicketCategoriesSeeded(pool: any) {
   if (!pool) return;
@@ -905,6 +931,15 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
       WHERE role IS NULL OR role = '' OR department_id IS NULL OR position_code IS NULL;
     `);
     console.log('✅ Safely checked non-admin employee defaults');
+
+    // Hash unhashed passwords in PostgreSQL employees table
+    try {
+      const unhashedRows = (await client.query(`SELECT id, password FROM employees WHERE password NOT LIKE 'scrypt:%' AND password IS NOT NULL AND password != ''`)).rows;
+      for (const row of unhashedRows) {
+        const hPass = hashPassword(row.password);
+        await client.query(`UPDATE employees SET password = $1 WHERE id = $2`, [hPass, row.id]);
+      }
+    } catch (e) {}
   } catch (e: any) {
     console.warn('Notice ensuring employees table normalization:', e.message);
   }
@@ -915,6 +950,10 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     for (const empId of Object.keys(db.employees || {})) {
       const emp = db.employees[empId];
       if (emp) {
+        if (!emp.password || !emp.password.startsWith('scrypt:')) {
+          emp.password = hashPassword(emp.password || 'password123');
+          updatedDb = true;
+        }
         if (!emp.role) {
           emp.role = 'employee';
           updatedDb = true;
@@ -1355,7 +1394,7 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
           emp.role,
           emp.status,
           emp.createdAt,
-          emp.password || 'password123',
+          hashPassword(emp.password || 'password123'),
           phone,
           deptId,
           posCode,
@@ -1503,7 +1542,7 @@ async function startServer() {
     const db = readDB();
     const employee = Object.values(db.employees).find(emp => emp.email.toLowerCase() === email.toLowerCase());
 
-    if (!employee || employee.password !== password) {
+    if (!employee || !verifyPassword(password, employee.password)) {
       res.status(401).json({ error: 'Неверные учетные данные' });
       return;
     }
@@ -1511,6 +1550,17 @@ async function startServer() {
     if (employee.status !== 'active') {
       res.status(403).json({ error: 'Ваш аккаунт еще не активирован. Проверьте почту для настройки пароля.' });
       return;
+    }
+
+    // Auto-upgrade legacy plaintext password if needed
+    if (employee.password && !employee.password.startsWith('scrypt:')) {
+      const newHash = hashPassword(password);
+      employee.password = newHash;
+      db.employees[employee.id] = employee;
+      writeDB(db);
+      if (pgPool) {
+        pgPool.query('UPDATE employees SET password = $1 WHERE id = $2', [newHash, employee.id]).catch(() => {});
+      }
     }
 
     // Strip password from returned payload
@@ -2086,8 +2136,9 @@ async function startServer() {
       return;
     }
 
-    // Set employee password and activate
-    employee.password = password;
+    // Set employee password (hashed) and activate
+    const hashedPassword = hashPassword(password);
+    employee.password = hashedPassword;
     employee.status = 'active';
     db.employees[employee.id] = employee;
 
@@ -2096,6 +2147,10 @@ async function startServer() {
     db.invitations[token] = invitation;
 
     writeDB(db);
+
+    if (pgPool) {
+      pgPool.query('UPDATE employees SET password = $1, status = $2 WHERE id = $3', [hashedPassword, 'active', employee.id]).catch(err => console.error('Error updating PostgreSQL employee password on activation:', err));
+    }
 
     const { password: _, ...activatedUser } = employee;
     res.json({

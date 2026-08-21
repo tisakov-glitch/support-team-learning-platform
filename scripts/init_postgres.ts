@@ -7,9 +7,18 @@ import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+function hashPassword(password: string): string {
+  if (!password) return '';
+  if (password.startsWith('scrypt:')) return password;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
 
 const { Client } = pg;
 
@@ -209,7 +218,7 @@ async function runMigration() {
             emp.role,
             emp.status || 'active',
             emp.createdAt || new Date().toISOString(),
-            emp.password || 'password123',
+            hashPassword(emp.password || 'password123'),
             phone,
             deptId,
             posCode,
