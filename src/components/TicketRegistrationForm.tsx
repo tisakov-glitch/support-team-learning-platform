@@ -71,6 +71,8 @@ export const TicketRegistrationForm: React.FC<TicketRegistrationFormProps> = ({
         }
       })
       .catch(() => {});
+  }, []);
+
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
