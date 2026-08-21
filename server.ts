@@ -839,82 +839,8 @@ pgPool = new pg.Pool(poolConfig);
 pgPool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
 
 async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
-  console.log('🔄 Running PostgreSQL employees table normalization...');
-
-  // 1. Ensure columns exist
-  // 1. Ensure columns exist
-  const addCols = [
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) DEFAULT '';`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) DEFAULT '';`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(64);`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) REFERENCES departments(id) ON DELETE SET NULL;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS position_code VARCHAR(64) REFERENCES positions(code) ON DELETE SET NULL;`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64);`,
-    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS course_started_dates JSONB DEFAULT '{}'::jsonb;`
-  ];
-  for (const q of addCols) {
-    try { await client.query(q); } catch (e) {}
-  }
-
-  // 2. Safely populate first_name and last_name from name column if name exists
-  try {
-    const checkName = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='name'`);
-    if (checkName.rowCount && checkName.rowCount > 0) {
-      await client.query(`
-        UPDATE employees SET 
-          first_name = CASE WHEN position(' ' in name) > 0 THEN split_part(name, ' ', 1) ELSE name END,
-          last_name = CASE WHEN position(' ' in name) > 0 THEN substring(name from position(' ' in name)+1) ELSE '' END
-        WHERE (first_name = '' OR first_name IS NULL) AND name IS NOT NULL AND name != '';
-      `);
-      console.log('✅ Migrated name -> first_name, last_name');
-    }
-  } catch (err: any) {
-    console.warn('Notice during name migration:', err.message);
-  }
-
-  // 3. Safely populate fields from profile column if profile exists
-  try {
-    const checkProfile = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='profile'`);
-    if (checkProfile.rowCount && checkProfile.rowCount > 0) {
-      try {
-        await client.query(`
-          UPDATE employees SET
-            phone = COALESCE(phone, (profile::jsonb)->>'phone'),
-            department_id = COALESCE(department_id, (profile::jsonb)->>'departmentId', (SELECT id FROM departments WHERE name = (profile::jsonb)->>'department' LIMIT 1)),
-            position_code = COALESCE(position_code, (profile::jsonb)->>'positionCode')
-          WHERE profile IS NOT NULL AND profile::text != '{}' AND profile::text != '';
-        `);
-      } catch (e: any) {
-        console.warn('Notice during profile jsonb field extraction:', e.message);
-      }
-      console.log('✅ Extracted fields from profile column');
-    }
-  } catch (err: any) {
-    console.warn('Notice checking profile column:', err.message);
-  }
-
-  // 4. Force Drop legacy columns
-  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS name CASCADE;`); } catch (e) {}
-  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS profile CASCADE;`); } catch (e) {}
-  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS bio CASCADE;`); } catch (e) {}
-  try { await client.query(`ALTER TABLE employees DROP COLUMN IF EXISTS specializations CASCADE;`); } catch (e) {}
-
   try {
     await client.query(`
-      ALTER TABLE employees ADD COLUMN IF NOT EXISTS rank_id VARCHAR(64) REFERENCES ranks(id) ON DELETE SET NULL;
-
-      DO $$ 
-      BEGIN
-          IF NOT EXISTS (
-              SELECT 1 FROM information_schema.table_constraints 
-              WHERE table_name = 'employees' AND constraint_name = 'fk_employees_rank_id'
-          ) THEN
-              ALTER TABLE employees 
-              ADD CONSTRAINT fk_employees_rank_id 
-              FOREIGN KEY (rank_id) REFERENCES ranks(id) ON DELETE SET NULL;
-          END IF;
-      EXCEPTION WHEN OTHERS THEN END $$;
-
       UPDATE employees 
       SET 
         role = COALESCE(NULLIF(role, ''), 'employee'),
@@ -922,7 +848,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
         position_code = COALESCE(position_code, '12')
       WHERE role IS NULL OR role = '' OR department_id IS NULL OR position_code IS NULL;
     `);
-    console.log('✅ Safely checked non-admin employee defaults');
 
     // Hash unhashed passwords in PostgreSQL employees table
     try {
@@ -949,26 +874,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
         if (!emp.role) {
           emp.role = 'employee';
           updatedDb = true;
-        }
-        if (emp.role !== 'admin') {
-          if (!emp.departmentId) {
-            emp.departmentId = 'dept-5';
-            emp.department = 'RetMind Support';
-            if (emp.profile) {
-              emp.profile.departmentId = 'dept-5';
-              emp.profile.department = 'RetMind Support';
-            }
-            updatedDb = true;
-          }
-          if (!emp.positionCode) {
-            emp.positionCode = '12';
-            emp.positionName = 'Support Shift Manager';
-            if (emp.profile) {
-              emp.profile.positionCode = '12';
-              emp.profile.positionName = 'Support Shift Manager';
-            }
-            updatedDb = true;
-          }
         }
       }
     }
@@ -1009,35 +914,19 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
       }
     }
 
-    let employeesRows: any[] = [];
-    try {
-      employeesRows = (await client.query(`
-        SELECT 
-          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
-          e.role, e.status, e.created_at as "createdAt", e.password,
-          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-          e.rank_id as "rankId", COALESCE(r.name, '') as "rankName",
-          e.course_started_dates as "courseStartedDates",
-          d.name as "departmentName", p.name as "positionName"
-        FROM employees e
-        LEFT JOIN departments d ON e.department_id = d.id
-        LEFT JOIN positions p ON e.position_code = p.code
-        LEFT JOIN ranks r ON e.rank_id = r.id
-      `)).rows;
-    } catch (e) {
-      employeesRows = (await client.query(`
-        SELECT 
-          e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
-          e.role, e.status, e.created_at as "createdAt", e.password,
-          e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
-          '' as "rankId", '' as "rankName",
-          e.course_started_dates as "courseStartedDates",
-          d.name as "departmentName", p.name as "positionName"
-        FROM employees e
-        LEFT JOIN departments d ON e.department_id = d.id
-        LEFT JOIN positions p ON e.position_code = p.code
-      `)).rows;
-    }
+    const employeesRows = (await client.query(`
+      SELECT 
+        e.id, e.email, e.first_name as "firstName", e.last_name as "lastName",
+        e.role, e.status, e.created_at as "createdAt", e.password,
+        e.phone, e.department_id as "departmentId", e.position_code as "positionCode",
+        e.rank_id as "rankId", COALESCE(r.name, '') as "rankName",
+        e.course_started_dates as "courseStartedDates",
+        d.name as "departmentName", p.name as "positionName"
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN positions p ON e.position_code = p.code
+      LEFT JOIN ranks r ON e.rank_id = r.id
+    `)).rows;
     const emails = (await client.query('SELECT id, to_email as "to", subject, body, token, sent_at as "sentAt", status FROM emails')).rows;
     const invitationsRows = (await client.query('SELECT id, employee_id as "employeeId", email, token, status, sent_at as "sentAt", expires_at as "expiresAt" FROM invitations')).rows;
     const courses = (await client.query('SELECT id, title, description, position_code as "positionCode", position_name as "positionName", rank, bindings, lessons, created_at as "createdAt", study_duration_days as "studyDurationDays", exam_duration_days as "examDurationDays" FROM courses')).rows;
