@@ -877,29 +877,44 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   };
 
   // Math metrics
-  const totalLessonsCount = courses.reduce((acc, c) => acc + (c.lessons?.length || 0), 0);
-  const completedLessonsCount = courses.reduce((acc, c) => 
-    acc + (c.lessons || []).filter(l => completedLessons.includes(l.id)).length, 0
+  // --- Safe Analytics & Metrics Calculation for Current Employee ---
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeGrades = Array.isArray(grades) ? grades : [];
+  const safeCompleted = Array.isArray(completedLessons) ? completedLessons : [];
+
+  const empId = profile?.id || employee?.id || '';
+  const empName = (profile?.name || employee?.name || '').toLowerCase();
+
+  const myAssignedTickets = safeTickets.filter(t => {
+    if (!t) return false;
+    if (t.assignedToId && empId && t.assignedToId === empId) return true;
+    if (t.assignedToName && empName && t.assignedToName.toLowerCase() === empName) return true;
+    return false;
+  });
+
+  const myOpenTickets = myAssignedTickets.filter(t => t && t.status !== 'closed');
+  const myResolvedTickets = myAssignedTickets.filter(t => t && t.status === 'closed');
+
+  const totalLessonsCount = safeCourses.reduce((acc, c) => acc + (c?.lessons?.length || 0), 0);
+  const completedLessonsCount = safeCourses.reduce((acc, c) => 
+    acc + (c?.lessons || []).filter(l => l?.id && safeCompleted.includes(l.id)).length, 0
   );
   const coursesProgressPercent = totalLessonsCount > 0 
     ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
     : 0;
-  // --- Computed Analytics & Metrics for Current Employee ---
-  const myAssignedTickets = tickets.filter(t => t.assignedToId === profile.id || (t.assignedToName && t.assignedToName.toLowerCase() === profile.name.toLowerCase()));
-  
-  const myOpenTickets = myAssignedTickets.filter(t => t.status !== 'closed');
-  const myResolvedTickets = myAssignedTickets.filter(t => t.status === 'closed');
-  
-  const totalAssignedLessons = courses.reduce((acc, c) => acc + (c.lessons ? c.lessons.length : 0), 0);
+
+  const totalAssignedLessons = totalLessonsCount;
   const learningProgressPercent = totalAssignedLessons > 0 ? Math.round((completedLessonsCount / totalAssignedLessons) * 100) : 0;
 
   const resolvedRatio = myAssignedTickets.length > 0 ? (myResolvedTickets.length / myAssignedTickets.length) * 100 : 100;
-  const averageGrade = grades.length > 0 ? (grades.reduce((acc, g) => acc + g.score, 0) / grades.length) : 5;
+  const averageGrade = safeGrades.length > 0 ? (safeGrades.reduce((acc, g) => acc + (g?.score || 0), 0) / safeGrades.length) : 5;
   const gradeRatio = (averageGrade / 5) * 100;
   const kpiScore = Math.min(100, Math.round(resolvedRatio * 0.6 + gradeRatio * 0.4));
 
   const clientCounts: Record<string, number> = {};
   myAssignedTickets.forEach(t => {
+    if (!t) return;
     const cName = t.client || 'Без клиента';
     clientCounts[cName] = (clientCounts[cName] || 0) + 1;
   });
@@ -909,12 +924,21 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
 
   const categoryCounts: Record<string, number> = {};
   myAssignedTickets.forEach(t => {
+    if (!t) return;
     const catName = t.system || t.kind || 'Общие вопросы';
     categoryCounts[catName] = (categoryCounts[catName] || 0) + 1;
   });
   const categoryBreakdown = Object.entries(categoryCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
+
+  const initials = (profile?.name || profile?.email || employee?.name || employee?.email || 'EM')
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   return (
     <div id="employee-dashboard-container" className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
@@ -932,7 +956,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
               <div className="text-right">
-                <div className="text-xs font-bold text-white leading-tight">{profile.name}</div>
+                <div className="text-xs font-bold text-white leading-tight">{profile?.name || employee?.name || 'Сотрудник'}</div>
                 <div className="text-[10px] text-[#C9B87A] font-mono">{profile.department || profile.profile?.department || 'Служба поддержки'}</div>
               </div>
               <div className="w-8 h-8 rounded-full bg-[#F5EFD7] text-[#0F172A] border border-[#C9B87A]/40 flex items-center justify-center font-mono text-xs font-bold shrink-0">
@@ -1026,12 +1050,12 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                     </div>
 
                     <div>
-                      <h2 className="text-lg font-black text-slate-900 tracking-tight">{profile.name}</h2>
-                      <p className="text-xs font-bold text-indigo-600 mt-0.5">{profile.positionName || profile.profile?.positionName || 'Support Specialist'}</p>
-                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{profile.department || profile.profile?.department || 'RetMind Support'}</p>
+                      <h2 className="text-lg font-black text-slate-900 tracking-tight">{profile?.name || employee?.name || 'Сотрудник'}</h2>
+                      <p className="text-xs font-bold text-indigo-600 mt-0.5">{profile?.positionName || profile?.profile?.positionName || 'Support Specialist'}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{profile?.department || profile?.profile?.department || 'RetMind Support'}</p>
                     </div>
 
-                    {profile.rank && (
+                    {profile?.rank && (
                       <div className="inline-block px-3 py-1 bg-indigo-50/80 border border-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold">
                         Ранг: {profile.rank}
                       </div>
@@ -1071,11 +1095,11 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
                     <div className="border-t border-slate-100 pt-4 space-y-2.5 text-xs">
                       <div className="flex items-center justify-between text-slate-600">
                         <span className="text-slate-400 font-medium">Email:</span>
-                        <span className="font-bold text-slate-800 truncate max-w-[180px]">{profile.email}</span>
+                        <span className="font-bold text-slate-800 truncate max-w-[180px]">{profile?.email || employee?.email || '—'}</span>
                       </div>
                       <div className="flex items-center justify-between text-slate-600">
                         <span className="text-slate-400 font-medium">Телефон:</span>
-                        <span className="font-bold text-slate-800">{profile.phone || '—'}</span>
+                        <span className="font-bold text-slate-800">{profile?.phone || profile?.profile?.phone || employee?.phone || '—'}</span>
                       </div>
                     </div>
                   )}
