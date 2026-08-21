@@ -1008,7 +1008,6 @@ async function loadDBFromPostgresAsync(): Promise<LocalDatabase | null> {
         pos.ranks = defPos?.ranks || [];
       }
     }
-    }
 
     let employeesRows: any[] = [];
     try {
