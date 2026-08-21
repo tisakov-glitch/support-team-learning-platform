@@ -1613,12 +1613,21 @@ async function startServer() {
     const resolvedPosCode = matchedPos ? matchedPos.code : (positionCode || '13');
     const resolvedPosName = matchedPos ? matchedPos.name : (positionName || 'Support Specialist');
 
-    let resolvedRankId = rankId || null;
-    const rankVal = rank || '';
-    if (!resolvedRankId && rankVal && resolvedPosCode) {
-      resolvedRankId = `${resolvedPosCode}-${rankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const posHasRanks = Boolean(matchedPos?.ranks && Array.isArray(matchedPos.ranks) && matchedPos.ranks.length > 0);
+    let targetRankVal = rank || '';
+    if (posHasRanks) {
+      if (!targetRankVal || !matchedPos!.ranks.includes(targetRankVal)) {
+        targetRankVal = matchedPos!.ranks[0];
+      }
+    } else {
+      targetRankVal = '';
     }
-    const resolvedRankName = rankVal;
+
+    let resolvedRankId = rankId || null;
+    if (targetRankVal && resolvedPosCode) {
+      resolvedRankId = `${resolvedPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    }
+    const resolvedRankName = targetRankVal;
 
     const profileObj = {
       phone: phone || '',
@@ -1843,8 +1852,18 @@ async function startServer() {
       targetEmployee.role = 'employee';
     }
 
-    const targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
     const currentPosCode = positionCode !== undefined ? positionCode : targetEmployee.positionCode;
+    const currentPosObj = (db.positions || []).find(p => p.code === currentPosCode);
+    const posHasRanks = Boolean(currentPosObj?.ranks && Array.isArray(currentPosObj.ranks) && currentPosObj.ranks.length > 0);
+
+    let targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
+    if (posHasRanks) {
+      if (!targetRankVal || !currentPosObj!.ranks.includes(targetRankVal)) {
+        targetRankVal = currentPosObj!.ranks[0];
+      }
+    } else {
+      targetRankVal = '';
+    }
 
     let resolvedRankId: string | null = rankId || null;
     let resolvedRankName = targetRankVal || '';
@@ -1852,7 +1871,7 @@ async function startServer() {
     if (!targetRankVal || targetRankVal.trim() === '') {
       resolvedRankId = null;
       resolvedRankName = '';
-    } else if (!resolvedRankId && currentPosCode) {
+    } else if (currentPosCode) {
       resolvedRankId = `${currentPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     }
 
