@@ -901,9 +901,6 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
 
   try {
     await client.query(`
-      ALTER TABLE ranks ALTER COLUMN position_code DROP NOT NULL;
-      GRANT ALL ON TABLE ranks TO PUBLIC;
-
       INSERT INTO ranks (id, position_code, name, sort_order)
       VALUES 
         ('12-shift-manager-l1', '12', 'Shift Manager L1', 1)
@@ -1361,6 +1358,7 @@ async function saveDBToPostgresAsync(data: LocalDatabase) {
       const posCode = emp.positionCode || emp.profile?.positionCode || null;
       let rankId = emp.rankId || emp.profile?.rankId || null;
       const rankVal = emp.rank || emp.profile?.rank;
+      const courseStarts = JSON.stringify(emp.courseStartedDates || emp.profile?.courseStartedDates || {});
       if (!rankId && rankVal) {
         try {
           const rRes = await pgPool.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rankVal, posCode]);
