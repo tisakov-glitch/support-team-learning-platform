@@ -988,7 +988,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             }`}
           >
             <BarChart3 className="w-4 h-4 text-[#C9B87A]" />
-            <span>📊 Главная и Аналитика</span>
+            <span>Главная и Аналитика</span>
           </button>
           <button
             onClick={() => setActiveModule('tickets')}
@@ -999,7 +999,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             }`}
           >
             <TicketIcon className="w-4 h-4 text-[#C9B87A]" />
-            <span>🎫 Мои Заявки ({myOpenTickets.length})</span>
+            <span>Мои Заявки ({myOpenTickets.length})</span>
           </button>
           <button
             onClick={() => setActiveModule('learning')}
@@ -1010,7 +1010,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             }`}
           >
             <BookOpen className="w-4 h-4 text-[#C9B87A]" />
-            <span>📚 Академия Обучения</span>
+            <span>Академия Обучения</span>
           </button>
         </div>
       </div>

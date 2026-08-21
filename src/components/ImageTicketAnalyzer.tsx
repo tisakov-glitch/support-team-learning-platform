@@ -155,32 +155,36 @@ export const ImageTicketAnalyzer: React.FC<ImageTicketAnalyzerProps> = ({ onReco
   };
 
   return (
-    <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
-      <div className="flex items-center gap-2 flex-wrap justify-end">
-        {error && (
+    <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+      {error && (
+        <div className="w-full flex justify-end">
           <span 
             title={error}
-            className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg font-medium border border-red-100 flex items-center gap-1 max-w-[200px] sm:max-w-xs animate-fade-in"
+            className="text-[10px] bg-red-50 text-red-700 px-2.5 py-1 rounded-lg font-medium border border-red-200 flex items-center gap-1.5 animate-fade-in shadow-xs"
           >
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{error}</span>
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+            <span className="truncate max-w-[260px]">{error}</span>
           </span>
-        )}
+        </div>
+      )}
 
-        {success && (
-          <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-medium border border-emerald-100 flex items-center gap-1 animate-fade-in">
-            <Check className="w-3.5 h-3.5 text-emerald-500" />
+      {success && (
+        <div className="w-full flex justify-end">
+          <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg font-medium border border-emerald-200 flex items-center gap-1.5 animate-fade-in shadow-xs">
+            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             <span>Скриншот успешно распознан!</span>
           </span>
-        )}
+        </div>
+      )}
 
+      <div className="flex items-center gap-2 flex-wrap justify-end">
         {/* Append/Overwrite mode switcher */}
-        <div className="flex items-center bg-slate-100/90 p-0.5 rounded-lg border border-slate-200/50 text-[10px] font-bold shadow-sm">
+        <div className="flex items-center bg-slate-100/90 p-0.5 rounded-lg border border-slate-200/50 text-[10px] font-bold shadow-xs">
           <button
             type="button"
             onClick={() => setIsAppendMode(false)}
             className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-              !isAppendMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              !isAppendMode ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
             title="Заменять существующие поля новыми данными с изображения"
           >
@@ -190,7 +194,7 @@ export const ImageTicketAnalyzer: React.FC<ImageTicketAnalyzerProps> = ({ onReco
             type="button"
             onClick={() => setIsAppendMode(true)}
             className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-              isAppendMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              isAppendMode ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
             title="Добавлять данные к уже заполненным полям"
           >
