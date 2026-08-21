@@ -1663,25 +1663,35 @@ async function startServer() {
 
     if (pgPool) {
       (async () => {
-        let finalRankId = rankId;
-        if (!finalRankId && rank && rank.trim() !== '') {
+        let finalRankId = rankId || resolvedRankId;
+        if (targetRankVal && targetRankVal.trim() !== '') {
           try {
-            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rank, resolvedPosCode]);
+            if (resolvedPosCode) {
+              await pgPool!.query(
+                `INSERT INTO positions (code, name, department_id, role_code)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (code) DO NOTHING`,
+                [resolvedPosCode, resolvedPosName || 'Position', resolvedDeptId || 'dept-5', role || 'employee']
+              );
+            }
+            const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1 OR id = $3) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [targetRankVal, resolvedPosCode, resolvedRankId]);
             if (rRes.rows[0]) {
               finalRankId = rRes.rows[0].id;
             } else {
-              const generatedId = resolvedPosCode 
-                ? `${resolvedPosCode}-${rank.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-                : `rank-${Math.random().toString(36).substr(2, 9)}`;
+              const generatedId = resolvedRankId || (resolvedPosCode 
+                ? `${resolvedPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+                : `rank-${Math.random().toString(36).substr(2, 9)}`);
               await pgPool!.query(
                 `INSERT INTO ranks (id, position_code, name, sort_order)
                  VALUES ($1, $2, $3, 1)
                  ON CONFLICT (id) DO UPDATE SET position_code = EXCLUDED.position_code, name = EXCLUDED.name`,
-                [generatedId, resolvedPosCode || null, rank]
+                [generatedId, resolvedPosCode || null, targetRankVal]
               );
               finalRankId = generatedId;
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error('Error finding/upserting rank in POST employee:', e);
+          }
         }
         if (!finalRankId) {
           finalRankId = null;
@@ -1903,19 +1913,27 @@ async function startServer() {
           } catch (e) {}
         }
 
-        let finalRankId: string | null = null;
+        let finalRankId: string | null = resolvedRankId;
         if (targetRankVal && targetRankVal.trim() !== '') {
           try {
+            if (currentPosCode) {
+              await pgPool!.query(
+                `INSERT INTO positions (code, name, department_id, role_code)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (code) DO NOTHING`,
+                [currentPosCode, targetEmployee.positionName || 'Position', finalDeptId || 'dept-5', targetEmployee.role || 'employee']
+              );
+            }
             const rRes = await pgPool!.query(
-              'SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1',
-              [targetRankVal, currentPosCode || null]
+              'SELECT id FROM ranks WHERE (id = $1 OR name = $1 OR id = $3) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1',
+              [targetRankVal, currentPosCode || null, resolvedRankId]
             );
             if (rRes.rows[0]) {
               finalRankId = rRes.rows[0].id;
             } else {
-              const generatedId = currentPosCode 
+              const generatedId = resolvedRankId || (currentPosCode 
                 ? `${currentPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-                : `rank-${Math.random().toString(36).substr(2, 9)}`;
+                : `rank-${Math.random().toString(36).substr(2, 9)}`);
               await pgPool!.query(
                 `INSERT INTO ranks (id, position_code, name, sort_order)
                  VALUES ($1, $2, $3, 1)
