@@ -2141,6 +2141,7 @@ export default function AdminDashboard({
     setSuccessMsg('');
 
     try {
+      const token = localStorage.getItem('support_learning_token');
       const response = await fetch('/api/employees', {
         method: 'POST',
         headers: {
@@ -3161,6 +3162,13 @@ export default function AdminDashboard({
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {error && (
+                      <div className="p-3.5 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-xs font-medium flex items-center gap-2">
+                        <span>⚠️</span>
+                        <span>{error}</span>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
