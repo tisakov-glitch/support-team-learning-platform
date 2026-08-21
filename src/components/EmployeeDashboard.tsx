@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, Phone, User, LogOut, CheckCircle2, Award, 
   HelpCircle, ChevronRight, Edit3, Check, Save, Tag, Plus, X, Globe, Star,
-  FileText, Video, ExternalLink, Ticket as TicketIcon, Search, AlertTriangle, Trash2, Paperclip
+  FileText, Video, ExternalLink, Ticket as TicketIcon, Search, AlertTriangle, Trash2, Paperclip,
+  TrendingUp, Building2, Layers, Clock, BarChart3, Inbox, Sparkles, Activity, ShieldCheck
 } from 'lucide-react';
 import { Employee, Course, Lesson, LessonGrade, Ticket, TicketChannel, TicketStatus, TicketCreatorType, SupportClient, SupportStore, SupportKind, SupportChannel, SupportCountry } from '../types';
 import { TICKET_CATEGORIES } from '../ticketCategories';
@@ -51,8 +52,8 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   const [grades, setGrades] = useState<LessonGrade[]>([]);
   const [gradesLoading, setGradesLoading] = useState(false);
 
-  // Ticket Academy State
-  const [activeModule, setActiveModule] = useState<'learning' | 'tickets'>('learning');
+  // Ticket Academy & Active View State
+  const [activeModule, setActiveModule] = useState<'overview' | 'tickets' | 'learning'>('overview');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isTicketsLoading, setIsTicketsLoading] = useState(false);
   const [ticketSearchQuery, setTicketSearchQuery] = useState('');
@@ -883,7 +884,37 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
   const coursesProgressPercent = totalLessonsCount > 0 
     ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
     : 0;
-  const initials = (profile?.name || profile?.email || 'EM').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  // --- Computed Analytics & Metrics for Current Employee ---
+  const myAssignedTickets = tickets.filter(t => t.assignedToId === profile.id || (t.assignedToName && t.assignedToName.toLowerCase() === profile.name.toLowerCase()));
+  
+  const myOpenTickets = myAssignedTickets.filter(t => t.status !== 'closed');
+  const myResolvedTickets = myAssignedTickets.filter(t => t.status === 'closed');
+  
+  const totalAssignedLessons = courses.reduce((acc, c) => acc + (c.lessons ? c.lessons.length : 0), 0);
+  const learningProgressPercent = totalAssignedLessons > 0 ? Math.round((completedLessonsCount / totalAssignedLessons) * 100) : 0;
+
+  const resolvedRatio = myAssignedTickets.length > 0 ? (myResolvedTickets.length / myAssignedTickets.length) * 100 : 100;
+  const averageGrade = grades.length > 0 ? (grades.reduce((acc, g) => acc + g.score, 0) / grades.length) : 5;
+  const gradeRatio = (averageGrade / 5) * 100;
+  const kpiScore = Math.min(100, Math.round(resolvedRatio * 0.6 + gradeRatio * 0.4));
+
+  const clientCounts: Record<string, number> = {};
+  myAssignedTickets.forEach(t => {
+    const cName = t.client || 'Без клиента';
+    clientCounts[cName] = (clientCounts[cName] || 0) + 1;
+  });
+  const clientBreakdown = Object.entries(clientCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const categoryCounts: Record<string, number> = {};
+  myAssignedTickets.forEach(t => {
+    const catName = t.system || t.kind || 'Общие вопросы';
+    categoryCounts[catName] = (categoryCounts[catName] || 0) + 1;
+  });
+  const categoryBreakdown = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
   return (
     <div id="employee-dashboard-container" className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
@@ -923,17 +954,17 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
 
       {/* Module Selector / Sub Header */}
       <div className="bg-[#F5EFD7]/70 border-b border-[#C9B87A]/40 py-3 px-6 shadow-xs">
-        <div className="max-w-6xl mx-auto flex gap-3">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-3">
           <button
-            onClick={() => setActiveModule('learning')}
+            onClick={() => setActiveModule('overview')}
             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
-              activeModule === 'learning'
+              activeModule === 'overview'
                 ? 'bg-[#0F172A] text-white border border-[#C9B87A]/50 shadow-md'
                 : 'bg-white border border-[#C9B87A]/40 text-[#0F172A] hover:bg-white/80'
             }`}
           >
-            <BookOpen className="w-4 h-4 text-[#C9B87A]" />
-            <span>Академия Обучения</span>
+            <BarChart3 className="w-4 h-4 text-[#C9B87A]" />
+            <span>📊 Главная и Аналитика</span>
           </button>
           <button
             onClick={() => setActiveModule('tickets')}
@@ -944,14 +975,394 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             }`}
           >
             <TicketIcon className="w-4 h-4 text-[#C9B87A]" />
-            <span>Ticket Academy (Заявки клиентов)</span>
+            <span>🎫 Мои Заявки ({myOpenTickets.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveModule('learning')}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+              activeModule === 'learning'
+                ? 'bg-[#0F172A] text-white border border-[#C9B87A]/50 shadow-md'
+                : 'bg-white border border-[#C9B87A]/40 text-[#0F172A] hover:bg-white/80'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-[#C9B87A]" />
+            <span>📚 Академия Обучения</span>
           </button>
         </div>
       </div>
 
       {/* Content Body */}
-      {activeModule === 'learning' ? (
-        <main className="flex-1 py-8 px-4 sm:px-6 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="flex-1 py-6 px-4 sm:px-6 max-w-6xl mx-auto w-full">
+
+        {/* Overview Tab */}
+        {activeModule === 'overview' && (
+          <div className="space-y-6 animate-fade-in">
+            
+            {/* Grid Row 1: Profile Card + Top 4 Metric Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              
+              {/* Employee Profile Widget (Left 4 cols) */}
+              <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200 shadow-xs p-6 flex flex-col justify-between relative overflow-hidden">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold uppercase tracking-wider border border-emerald-200/60">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Активный сотрудник
+                    </span>
+                    <button
+                      onClick={() => setEditMode(!editMode)}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+                      title="Редактировать контакты"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="text-center space-y-3 pt-2">
+                    <div className="relative inline-block">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-mono text-2xl font-bold mx-auto shadow-md shadow-indigo-100">
+                        {initials}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg font-black text-slate-900 tracking-tight">{profile.name}</h2>
+                      <p className="text-xs font-bold text-indigo-600 mt-0.5">{profile.positionName || profile.profile?.positionName || 'Support Specialist'}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{profile.department || profile.profile?.department || 'RetMind Support'}</p>
+                    </div>
+
+                    {profile.rank && (
+                      <div className="inline-block px-3 py-1 bg-indigo-50/80 border border-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold">
+                        Ранг: {profile.rank}
+                      </div>
+                    )}
+                  </div>
+
+                  {editMode ? (
+                    <form onSubmit={handleSaveProfile} className="space-y-3 border-t border-slate-100 pt-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Телефон связи</label>
+                        <input
+                          type="text"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+996 555 123456"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                        >
+                          {saving ? 'Сохранение...' : 'Сохранить'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditMode(false)}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="border-t border-slate-100 pt-4 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="text-slate-400 font-medium">Email:</span>
+                        <span className="font-bold text-slate-800 truncate max-w-[180px]">{profile.email}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="text-slate-400 font-medium">Телефон:</span>
+                        <span className="font-bold text-slate-800">{profile.phone || '—'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-slate-100 flex gap-2">
+                  <button
+                    onClick={() => setActiveModule('tickets')}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-indigo-100 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <TicketIcon className="w-3.5 h-3.5" />
+                    <span>Мои заявки</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveModule('learning')}
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Top 4 Metric KPI Cards (Right 8 cols) */}
+              <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* Metric 1: Open Tickets */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between hover:border-indigo-300 transition-all">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Открытые заявки</span>
+                      <div className="text-3xl font-black text-slate-900 tracking-tight flex items-baseline gap-2">
+                        {myOpenTickets.length}
+                        <span className="text-xs font-bold text-slate-400 font-normal">в очереди</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Закреплены за вами</span>
+                    <button onClick={() => setActiveModule('tickets')} className="text-indigo-600 font-bold hover:underline">
+                      Перейти к заявкам &rarr;
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metric 2: Resolved Tickets */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between hover:border-emerald-300 transition-all">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Решено заявок</span>
+                      <div className="text-3xl font-black text-slate-900 tracking-tight flex items-baseline gap-2">
+                        {myResolvedTickets.length}
+                        <span className="text-xs font-bold text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
+                          {myAssignedTickets.length > 0 ? Math.round((myResolvedTickets.length / myAssignedTickets.length) * 100) : 100}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Всего обработано</span>
+                    <span className="font-bold text-slate-700">{myAssignedTickets.length} заявок</span>
+                  </div>
+                </div>
+
+                {/* Metric 3: KPI / Work Efficiency Rating */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between hover:border-indigo-300 transition-all">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Эффективность (KPI)</span>
+                      <div className="text-3xl font-black text-indigo-600 tracking-tight flex items-baseline gap-2">
+                        {kpiScore}%
+                        <span className="text-xs font-bold text-slate-400 font-normal">SLA & Оценки</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
+                      <TrendingUp className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-1.5">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${kpiScore}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 4: Learning Progress */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between hover:border-indigo-300 transition-all">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Прогресс обучения</span>
+                      <div className="text-3xl font-black text-slate-900 tracking-tight flex items-baseline gap-2">
+                        {completedLessonsCount} / {totalAssignedLessons}
+                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                          {learningProgressPercent}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
+                      <Award className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Назначено курсов</span>
+                    <button onClick={() => setActiveModule('learning')} className="text-indigo-600 font-bold hover:underline">
+                      {courses.length} курсов &rarr;
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Grid Row 2: Client & Category Distribution Analytics */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Client Breakdown Card */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-slate-900">Заявки по Клиентам</h3>
+                      <p className="text-[11px] text-slate-400 font-medium">Распределение обрабатываемых обращений</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                    Топовые бренды
+                  </span>
+                </div>
+
+                {clientBreakdown.length > 0 ? (
+                  <div className="space-y-3 pt-1">
+                    {clientBreakdown.map(([cName, count], idx) => {
+                      const pct = myAssignedTickets.length > 0 ? Math.round((count / myAssignedTickets.length) * 100) : 0;
+                      return (
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="text-slate-800 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                              {cName}
+                            </span>
+                            <span className="text-slate-500 font-mono">{count} заяв. ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div className="bg-indigo-600 h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-400 text-xs font-medium">
+                    Пока нет закрепленных заявк по клиентам
+                  </div>
+                )}
+              </div>
+
+              {/* Category / System Breakdown Card */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-slate-900">Категории и Системы</h3>
+                      <p className="text-[11px] text-slate-400 font-medium">Классификация проблем и модулей</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                    Темы проблем
+                  </span>
+                </div>
+
+                {categoryBreakdown.length > 0 ? (
+                  <div className="space-y-3 pt-1">
+                    {categoryBreakdown.map(([catName, count], idx) => {
+                      const pct = myAssignedTickets.length > 0 ? Math.round((count / myAssignedTickets.length) * 100) : 0;
+                      return (
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="text-slate-800 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              {catName}
+                            </span>
+                            <span className="text-slate-500 font-mono">{count} заяв. ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-400 text-xs font-medium">
+                    Пока нет закрепленных категорий
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Grid Row 3: Quick Active Tickets Queue */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">Очередь активных заявок ({myOpenTickets.length})</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">Заявки в работе и требующие внимания</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveModule('tickets')}
+                  className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Все обращения &rarr;
+                </button>
+              </div>
+
+              {myOpenTickets.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {myOpenTickets.slice(0, 6).map(t => (
+                    <div key={t.id} className="p-4 bg-slate-50 hover:bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all shadow-2xs space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">#{t.id}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                            t.status === 'in_progress' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
+                          }`}>
+                            {t.status === 'in_progress' ? 'В работе' : 'Новое'}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xs text-slate-900 line-clamp-2">{t.subject}</h4>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                          <span className="font-semibold text-slate-700">{t.client || 'Без клиента'}</span>
+                          <span>•</span>
+                          <span>{t.storeName || t.requesterName || 'Клиент'}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                        {t.status !== 'in_progress' && (
+                          <button
+                            onClick={() => handleUpdateTicketStatus(t.id, 'in_progress' as any)}
+                            className="flex-1 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer"
+                          >
+                            Взять в работу
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedTicketId(t.id);
+                            setActiveModule('tickets');
+                          }}
+                          className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer text-center"
+                        >
+                          Открыть &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs font-medium space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                  <p>В вашей очереди нет открытых заявк. Все обращения обработаны!</p>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+      {/* Learning Tab */}
+      {activeModule === 'learning' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Personal Profile & Settings */}
         <div className="lg:col-span-1 space-y-6">
@@ -1311,10 +1722,12 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             )}
           </div>
         </div>
-      </main>
-      ) : (
-        <main className="flex-1 py-8 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-6 animate-fade-in">
-          {/* Ticket Academy for Employees */}
+      )}
+
+      {/* Tickets Tab */}
+      {activeModule === 'tickets' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Ticket Academy Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 text-white p-6 rounded-2xl shadow-xl border border-slate-950">
             <div className="space-y-1">
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-indigo-400">Модуль поддержки</span>
@@ -1992,8 +2405,10 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
               )}
             </div>
           </div>
-        </main>
+        </div>
       )}
+
+      </main>
 
       {/* Lesson View Overlay Modal */}
       <AnimatePresence>
