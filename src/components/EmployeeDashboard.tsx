@@ -1722,6 +1722,7 @@ export default function EmployeeDashboard({ employee, onLogout, onProfileUpdate 
             )}
           </div>
         </div>
+      </div>
       )}
 
       {/* Tickets Tab */}
