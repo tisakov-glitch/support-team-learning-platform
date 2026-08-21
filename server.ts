@@ -899,13 +899,11 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
 
       UPDATE employees 
       SET 
-        role = 'employee',
-        department_id = 'dept-5',
-        position_code = '12',
-        rank_id = '12-shift-manager-l1'
-      WHERE role != 'admin';
+        department_id = COALESCE(department_id, 'dept-5'),
+        position_code = COALESCE(position_code, '12')
+      WHERE role != 'admin' AND (department_id IS NULL OR position_code IS NULL);
     `);
-    console.log('✅ Updated non-admin employees: role=employee, dept=dept-5, pos=12, rank=12-shift-manager-l1');
+    console.log('✅ Safely checked non-admin employee defaults');
   } catch (e: any) {
     console.warn('Notice ensuring employees table normalization:', e.message);
   }
@@ -916,22 +914,24 @@ async function ensureEmployeesTableNormalized(client: pg.PoolClient | pg.Pool) {
     for (const empId of Object.keys(db.employees || {})) {
       const emp = db.employees[empId];
       if (emp && emp.role !== 'admin') {
-        emp.role = 'employee';
-        emp.departmentId = 'dept-5';
-        emp.department = 'RetMind Support';
-        emp.positionCode = '12';
-        emp.positionName = 'Support Shift Manager';
-        emp.rankId = '12-shift-manager-l1';
-        emp.rank = 'Shift Manager L1';
-        if (emp.profile) {
-          emp.profile.departmentId = 'dept-5';
-          emp.profile.department = 'RetMind Support';
-          emp.profile.positionCode = '12';
-          emp.profile.positionName = 'Support Shift Manager';
-          emp.profile.rankId = '12-shift-manager-l1';
-          emp.profile.rank = 'Shift Manager L1';
+        if (!emp.departmentId) {
+          emp.departmentId = 'dept-5';
+          emp.department = 'RetMind Support';
+          if (emp.profile) {
+            emp.profile.departmentId = 'dept-5';
+            emp.profile.department = 'RetMind Support';
+          }
+          updatedDb = true;
         }
-        updatedDb = true;
+        if (!emp.positionCode) {
+          emp.positionCode = '12';
+          emp.positionName = 'Support Shift Manager';
+          if (emp.profile) {
+            emp.profile.positionCode = '12';
+            emp.profile.positionName = 'Support Shift Manager';
+          }
+          updatedDb = true;
+        }
       }
     }
     if (updatedDb) {
@@ -1608,11 +1608,10 @@ async function startServer() {
 
     let resolvedRankId = rankId || null;
     const rankVal = rank || '';
-    if (!resolvedRankId && rankVal) {
-      const rMatch = (db.ranks || []).find(r => r.id === rankVal || r.name === rankVal);
-      if (rMatch) resolvedRankId = rMatch.id;
+    if (!resolvedRankId && rankVal && resolvedPosCode) {
+      resolvedRankId = `${resolvedPosCode}-${rankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     }
-    const resolvedRankName = (db.ranks || []).find(r => r.id === resolvedRankId)?.name || rankVal;
+    const resolvedRankName = rankVal;
 
     const profileObj = {
       phone: phone || '',
@@ -1649,10 +1648,23 @@ async function startServer() {
     if (pgPool) {
       (async () => {
         let finalRankId = rankId;
-        if (!finalRankId && rank) {
+        if (!finalRankId && rank && rank.trim() !== '') {
           try {
             const rRes = await pgPool!.query('SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1', [rank, resolvedPosCode]);
-            if (rRes.rows[0]) finalRankId = rRes.rows[0].id;
+            if (rRes.rows[0]) {
+              finalRankId = rRes.rows[0].id;
+            } else {
+              const generatedId = resolvedPosCode 
+                ? `${resolvedPosCode}-${rank.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+                : `rank-${Math.random().toString(36).substr(2, 9)}`;
+              await pgPool!.query(
+                `INSERT INTO ranks (id, position_code, name, sort_order)
+                 VALUES ($1, $2, $3, 1)
+                 ON CONFLICT (id) DO UPDATE SET position_code = EXCLUDED.position_code, name = EXCLUDED.name`,
+                [generatedId, resolvedPosCode || null, rank]
+              );
+              finalRankId = generatedId;
+            }
           } catch (e) {}
         }
         if (!finalRankId) {
@@ -1807,25 +1819,27 @@ async function startServer() {
       }
     }
 
-    if (positionCode !== undefined) targetEmployee.positionCode = positionCode;
+    if (positionCode !== undefined) {
+      targetEmployee.positionCode = positionCode;
+      const matchedPos = (db.positions || []).find(p => p.code === positionCode);
+      if (matchedPos) {
+        targetEmployee.positionName = matchedPos.name;
+      }
+    }
     if (positionName !== undefined) targetEmployee.positionName = positionName;
 
     const targetRankVal = rank !== undefined ? rank : targetEmployee.rank;
     const currentPosCode = positionCode !== undefined ? positionCode : targetEmployee.positionCode;
 
     let resolvedRankId: string | null = rankId || null;
-    if (!resolvedRankId && targetRankVal) {
-      const rMatch = (db.ranks || []).find(r => 
-        (r.id === targetRankVal || r.name === targetRankVal) && 
-        (!currentPosCode || r.positionCode === currentPosCode)
-      ) || (db.ranks || []).find(r => r.id === targetRankVal || r.name === targetRankVal);
-      if (rMatch) resolvedRankId = rMatch.id;
-    }
-    if (!rank && rank !== undefined) {
-      resolvedRankId = null;
-    }
+    let resolvedRankName = targetRankVal || '';
 
-    const resolvedRankName = (db.ranks || []).find(r => r.id === resolvedRankId)?.name || targetRankVal || '';
+    if (!targetRankVal || targetRankVal.trim() === '') {
+      resolvedRankId = null;
+      resolvedRankName = '';
+    } else if (!resolvedRankId && currentPosCode) {
+      resolvedRankId = `${currentPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    }
 
     targetEmployee.rank = resolvedRankName;
     targetEmployee.rankId = resolvedRankId || '';
@@ -1856,7 +1870,7 @@ async function startServer() {
         }
 
         let finalRankId: string | null = null;
-        if (targetRankVal) {
+        if (targetRankVal && targetRankVal.trim() !== '') {
           try {
             const rRes = await pgPool!.query(
               'SELECT id FROM ranks WHERE (id = $1 OR name = $1) AND ($2::varchar IS NULL OR position_code = $2) LIMIT 1',
@@ -1865,13 +1879,20 @@ async function startServer() {
             if (rRes.rows[0]) {
               finalRankId = rRes.rows[0].id;
             } else {
-              const rRes2 = await pgPool!.query(
-                'SELECT id FROM ranks WHERE (id = $1 OR name = $1) LIMIT 1',
-                [targetRankVal]
+              const generatedId = currentPosCode 
+                ? `${currentPosCode}-${targetRankVal.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+                : `rank-${Math.random().toString(36).substr(2, 9)}`;
+              await pgPool!.query(
+                `INSERT INTO ranks (id, position_code, name, sort_order)
+                 VALUES ($1, $2, $3, 1)
+                 ON CONFLICT (id) DO UPDATE SET position_code = EXCLUDED.position_code, name = EXCLUDED.name`,
+                [generatedId, currentPosCode || null, targetRankVal]
               );
-              if (rRes2.rows[0]) finalRankId = rRes2.rows[0].id;
+              finalRankId = generatedId;
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error('Error finding/upserting rank in PostgreSQL:', e);
+          }
         }
 
         await pgPool!.query(
